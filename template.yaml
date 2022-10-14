@@ -1,0 +1,355 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM Template for airway shipment orchestrator app
+
+Parameters:
+  ShipmentRecordQueueName:
+    Type: String
+    Description: 'Name of the AWS SQS queue to be created'
+    Default: ShipmentRecordQueue
+  ShipmentRecordTableName:
+    Type: String
+    Description: 'Name of the AWS DynamoDB Table for storing the shipment records to be created'
+    Default: ShipmentRecord
+  ShipmentHashTableName:
+    Type: String
+    Description: 'Name of the AWS DynamoDB Table for storing the shipment hashes to be created'
+    Default: ShipmentHash
+
+Resources:
+  ShipmentRecordQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      Name: !Ref ShipmentRecordQueueName
+    ShipmentRecordDLQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        Name: !Join ["", [ !Ref ShipmentRecordQueueName, "-DLQ" ] ]
+
+  ShipmentHashDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref ShipmentHashTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: wasProcessed
+          AttributeType: BOOL
+        - AttributeName: addrHashCode
+          AttributeType: S
+      KeySchema:
+        - AttributeName: addrHashCode
+          KeyType: HASH
+      Tags:
+        - Key: Name
+          Value: ShipmentHashTable
+  ShipmentRecordDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref ShipmentRecordTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: recordId
+          AttributeType: S
+        - AttributeName: body
+          AttributeType: S
+        - AttributeName: processTime
+          AttributeType: S
+        - AttributeName: addrHashCode
+          AttributeType: S
+      KeySchema:
+        - AttributeName: addrHashCode
+          KeyType: HASH
+        - AttributeName: recordId
+          KeyType: RANGE
+      Tags:
+        - Key: Name
+          Value: ShipmentHashTable
+
+  StepFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "states.amazonaws.com"
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: StepFunctionNotificationPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                # For event subscription & notification
+                - "events:PutTargets"
+                - "events:PutRule"
+                - "events:DescribeRule"
+                Resource:
+                - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/StepFunctionsGetEventsForStepFunctionsExecutionRule
+
+              - Effect: Allow
+                Action:
+                # Logging
+                - "logs:CreateLogDelivery"
+                - "logs:GetLogDelivery"
+                - "logs:UpdateLogDelivery"
+                - "logs:DeleteLogDelivery"
+                - "logs:ListLogDeliveries"
+                - "logs:PutResourcePolicy"
+                - "logs:DescribeResourcePolicies"
+                - "logs:DescribeLogGroups"
+                # Following required for step function to send/receive notification from child step function
+                - "cloudwatch:PutMetricData"
+                # For child step function invoke/stop
+                - "states:StartExecution"
+                - "states:StopExecution"
+                - "states:DescribeExecution"
+                # X-ray enabling
+                - "xray:PutTraceSegments"
+                - "xray:PutTelemetryRecords"
+                - "xray:GetSamplingRules"
+                - "xray:GetSamplingTargets"
+                Resource:
+                    - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:*
+
+              - Effect: Allow
+                Action:
+                # For Lambda invocations
+                - "lambda:InvokeFunction"
+                Resource: [
+                  !GetAtt BatchJobSubmitFunction.Arn,
+                  !GetAtt CallbackNotifyFunction.Arn
+                ]
+              - Effect: Allow
+                Action:
+                # For Lambda invocations
+                - "sqs:Get*"
+                - "sqs:List*"
+                - "sqs:Send*"
+                - "sqs:Receive*"
+                Resource: [
+                  !GetAtt ShipmentRecordQueue.Arn,
+                  !GetAtt ShipmentRecordDLQueue.Arn
+                ]
+        - PolicyName: DDBReadWrite
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DescribeTable
+                  - dynamodb:ListTables
+                  - dynamodb:GetItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: [
+                  !GetAtt ShipmentHashDynamoDBTable.Arn,
+                  !GetAtt ShipmentRecordDynamoDBTable.Arn
+                ]
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DDBReadWrite-CWLogging-StepFunctionExecution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DescribeTable
+                  - dynamodb:ListTables
+                  - dynamodb:GetItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: [
+                  !GetAtt ShipmentHashDynamoDBTable.Arn,
+                  !GetAtt ShipmentRecordDynamoDBTable.Arn
+                ]
+              - Effect: Allow
+                Action:
+                # Logging
+                - "logs:CreateLogDelivery"
+                - "logs:GetLogDelivery"
+                - "logs:UpdateLogDelivery"
+                - "logs:DeleteLogDelivery"
+                - "logs:ListLogDeliveries"
+                - "logs:PutResourcePolicy"
+                - "logs:DescribeResourcePolicies"
+                - "logs:DescribeLogGroups"
+                - "cloudwatch:PutMetricData"
+                - "states:StartExecution"
+                - "states:StopExecution"
+                # X-ray enabling
+                - "xray:PutTraceSegments"
+                - "xray:PutTelemetryRecords"
+                - "xray:GetSamplingRules"
+                - "xray:GetSamplingTargets"
+                Resource:
+                    - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:*
+              - Effect: Allow
+                Action:
+                # For Lambda invocations
+                - "sqs:Get*"
+                - "sqs:List*"
+                - "sqs:Send*"
+                - "sqs:Receive*"
+                Resource: [
+                  !GetAtt ShipmentRecordQueue.Arn,
+                  !GetAtt ShipmentRecordDLQueue.Arn
+                ]
+
+  OrderValidatorFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: LambdaExecutionRole
+    Properties:
+      CodeUri: functions/order_validator/
+      Handler: validator.lambda_handler
+      Runtime: python3.9
+      Timeout: 200
+      Environment:
+        Variables:
+          BUSINESS_VALIDATION_STEPFUNCTION: !GetAtt BusinessValidationStateMachine1.Arn
+      Role: !GetAtt LambdaExecutionRole.Arn
+
+  AirwayShipmentGeneratorFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: LambdaExecutionRole
+    Properties:
+      CodeUri: functions/airway_shipment_generator/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Timeout: 25
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          SHIPMENT_RECORD_TABLE: !GetAtt ShipmentRecordDynamoDBTable.TableName
+
+  ShipmentAddressGrouperFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: LambdaExecutionRole
+    Properties:
+      CodeUri: functions/shipment_address_grouper/
+      Handler: shipment_grouper.lambda_handler
+      Runtime: python3.9
+      Timeout: 25
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          SHIPMENT_HASH_TABLE: !GetAtt ShipmentHashDynamoDBTable.TableName
+
+
+  UPSShipperFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: LambdaExecutionRole
+    Properties:
+      CodeUri: functions/ups_shipper/
+      Handler: ups_app.lambda_handler
+      Runtime: python3.9
+      Timeout: 25
+      Role: !GetAtt LambdaExecutionRole.Arn
+
+  InventoryHandlerFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: LambdaExecutionRole
+    Properties:
+      CodeUri: functions/inventory_handler/
+      Handler: inventory_app.lambda_handler
+      Runtime: python3.9
+      Timeout: 25
+      Role: !GetAtt LambdaExecutionRole.Arn
+
+  SupplierHandlerFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: LambdaExecutionRole
+    Properties:
+      CodeUri: functions/supplier_handler/
+      Handler: supplier_app.lambda_handler
+      Runtime: python3.9
+      Timeout: 25
+      Role: !GetAtt LambdaExecutionRole.Arn
+
+
+
+  SAWBProcessorStateMachine3:
+    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    Properties:
+      DefinitionUri: statemachine/sawbprocessing_step_function.asl.json
+      Role: !GetAtt StepFunctionRole.Arn
+      DefinitionSubstitutions:
+        ShipmentHashTable: !GetAtt ShipmentHashDynamoDBTable.TableName
+        ShipmentRecordTable: !GetAtt ShipmentRecordDynamoDBTable.TableName
+        BusinessRulesValidatorLambdaArn: !GetAtt OrderValidatorFunction.Arn
+        ShipmentQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !Ref ShipmentRecordQueueName ] ]
+        ShipmentDLQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !GetAtt ShipmentRecordDLQueue.Name ] ]
+        SAWBHandler: !GetAtt AirwayShipmentGeneratorFunction.Arn
+        InventoryHandler: !GetAtt InventoryHandlerFunction.Arn
+        SupplierHandler: !GetAtt SupplierHandlerFunction.Arn
+        UPSShipperService: !GetAtt UPSShipperFunction.Arn
+
+  AggregationKickoffStateMachine2:
+    Type: AWS::Serverless::StateMachine
+    #DependsOn: [ ]
+    Properties:
+      DefinitionUri: statemachine/aggregation_kickoff_step_function.asl.json
+      Role: !GetAtt StepFunctionRole.Arn
+      DefinitionSubstitutions:
+        SWABProcessorStepFunction: !GetAtt SAWBProcessorStateMachine3.Arn
+        ShipmentAddressGrouperFunction: !GetAtt ShipmentAddressGrouperFunction.Arn
+        ShipmentQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !Ref ShipmentRecordQueueName ] ]
+        ShipmentDLQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !GetAtt ShipmentRecordDLQueue.Name ] ]
+
+  BusinessValidationStateMachine1:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachine/business_validation_step_function.asl.json
+      Role: !GetAtt StepFunctionRole.Arn
+      DefinitionSubstitutions:
+        ShipmentHashTable: !GetAtt ShipmentHashDynamoDBTable.TableName
+        ShipmentRecordTable: !GetAtt ShipmentRecordDynamoDBTable.TableName
+        BusinessRulesValidatorLambdaArn: !GetAtt OrderValidatorFunction.Arn
+        ShipmentQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !Ref ShipmentRecordQueueName ] ]
+        ShipmentDLQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !GetAtt ShipmentRecordDLQueue.Name ] ]
+
+
+Outputs:
+  ShipmentRecordQueue:
+    Description: Shipment Record Queue for processing of shipments
+    Value: !GetAtt ShipmentRecordQueue.Name
+  ShipmentRecordDLQueue:
+    Description: Shipment Record Dead Letter Queue (DLQ) for error/poison messages
+    Value: !GetAtt ShipmentRecordDLQueue.Name
+  BusinessValidatorStepFunction:
+    Value: !Ref BusinessValidationStateMachine1
+    Description: Name of the Business validation step function
+  AggregationKickoffStepFunction:
+    Value: !Ref AggregationKickoffStateMachine2
+    Description: Name of the Shipment Aggregator step function
+  SAWBProcessorStepFunction:
+    Value: !Ref SAWBProcessorStateMachine3
+    Description: Name of the SAWB Processor step function

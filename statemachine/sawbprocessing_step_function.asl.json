@@ -1,0 +1,156 @@
+{
+  "Comment": "SAWB Processing state machine",
+  "StartAt": "Invoke SAWB",
+  "States": {
+    "Invoke SAWB": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultSelector": {
+        "AirwayBill.$": "$.Payload"
+      },
+      "ResultPath": "$.AirwayBill",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${SAWBHandler}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Invoke Inventory"
+    },
+    "Invoke Inventory": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultSelector": {
+        "inventory.$": "$.Payload.Inventory"
+      },
+      "ResultPath": "$.InventoryResult",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${InventoryHandler}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Choice"
+    },
+    "Choice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.InventoryResult.inventory.available",
+          "IsPresent": true,
+          "Next": "GoWithSupplier"
+        }
+      ],
+      "Default": "ReplaceSupplier"
+    },
+    "GoWithSupplier": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${SupplierHandler}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "DynamoDB UpdateItem"
+    },
+    "DynamoDB UpdateItem": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "${ShipmentHashTable}",
+        "Key": {
+          "addrHashCode": {
+            "S.$": "$.addrHashCode"
+          }
+        },
+        "UpdateExpression": "SET wasProcessed = :myValueRef",
+        "ExpressionAttributeValues": {
+          ":myValueRef": {
+            "S": "true"
+          }
+        }
+      },
+      "ResultSelector": {
+        "ShipmentHashUpdate.$": "$.SdkHttpMetadata.HttpStatusCode"
+      },
+      "Next": "UPS Shipment Invoke",
+      "ResultPath": "$.GroupShipmentHashUpdate"
+    },
+    "UPS Shipment Invoke": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${UPSShipperService}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "End": true
+    },
+    "ReplaceSupplier": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${SupplierHandler}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "DynamoDB UpdateItem"
+    }
+  }
+}
