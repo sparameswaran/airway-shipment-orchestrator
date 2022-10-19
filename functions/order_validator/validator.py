@@ -2,6 +2,7 @@ import json
 import boto3
 import hashlib
 import io
+import os
 import time
 
 client = boto3.client('stepfunctions')

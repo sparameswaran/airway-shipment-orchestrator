@@ -1,5 +1,6 @@
 import json
 import boto3
+import os
 import uuid
 from boto3.dynamodb.conditions import Key
 from boto3.dynamodb.conditions import Attr

@@ -10,7 +10,7 @@
     "Check Queue Depth": {
       "Type": "Task",
       "Parameters": {
-        "QueueUrl": "${ShipmentQueueUrl}",
+        "QueueUrl": "https://sqs.us-east-1.amazonaws.com/523933434461/ShipmentRecordQueue",
         "AttributeNames": [
           "ApproximateNumberOfMessages"
         ]
@@ -37,7 +37,7 @@
     "Recheck Queue Depth": {
       "Type": "Task",
       "Parameters": {
-        "QueueUrl": "${ShipmentQueueUrl}",
+        "QueueUrl": "https://sqs.us-east-1.amazonaws.com/523933434461/ShipmentRecordQueue",
         "AttributeNames": [
           "ApproximateNumberOfMessages"
         ]
@@ -69,7 +69,7 @@
       },
       "Parameters": {
         "Payload.$": "$",
-        "FunctionName": "${ShipmentAddressGrouperFunction}"
+        "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:airway-shipment-ShipmentAddressGrouperFunction-NMkgljuRFhPr"
       },
       "Retry": [
         {
@@ -94,7 +94,7 @@
             "Type": "Task",
             "Resource": "arn:aws:states:::states:startExecution.sync:2",
             "Parameters": {
-              "StateMachineArn": "${SWABProcessorStepFunction}",
+              "StateMachineArn": "arn:aws:states:us-east-1:523933434461:stateMachine:SAWBProcessorStateMachine3-R3DWZve6y9CD",
               "Input": {
                 "addrHashCode.$": "$.addrHashCode",
                 "AWS_STEP_FUNCTIONS_STARTED_BY_EXECUTION_ID.$": "$$.Execution.Id"

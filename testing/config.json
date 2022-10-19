@@ -1,0 +1,283 @@
+{
+  "config": {
+    "target": "https://EDIT_ME_.execute-api.us-east-1.amazonaws.com",
+    "phases": [
+      { "duration": 1, "arrivalRate": 20 }
+    ],
+    "payload": {
+      "path": "./2repeatingaddresses.csv",
+      "fields": ["street", "city", "state", "zip", "country"],
+      "options": {
+        "delimiter": ","
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "flow": [
+        {
+          "post": {
+            "url": "/dev/postShipment", 
+            "json": {
+                      
+            "interchanges": [
+              {
+                "interchange_control_header_ISA": {
+                  "authorization_information_qualifier_01": "no_authorization_information_present_no_meaningful_information_in_i02_00",
+                  "authorization_information_02": "",
+                  "security_information_qualifier_03": "no_security_information_present_no_meaningful_information_in_i04_00",
+                  "security_information_04": "",
+                  "interchange_id_qualifier_05": "duns_dun_bradstreet_01",
+                  "interchange_sender_id_06": "BIGETP",
+                  "interchange_id_qualifier_07": "duns_dun_bradstreet_01",
+                  "interchange_receiver_id_08": "035230000",
+                  "interchange_date_09": "180327",
+                  "interchange_time_10": "0131",
+                  "interchange_control_standards_identifier_11": "us_edi_community_of_asc_x12_tdcc_and_ucs_U",
+                  "interchange_control_version_number_12": "00401",
+                  "interchange_control_number_13": "000575103",
+                  "acknowledgment_requested_14": "no_acknowledgment_requested_0",
+                  "usage_indicator_15": "production_data_P",
+                  "component_element_separator_16": "^"
+                },
+                "groups": [
+                  {
+                    "functional_group_header_GS": {
+                      "functional_identifier_code_01": "warehouse_shipping_order_940_OW",
+                      "application_senders_code_02": "053980000",
+                      "application_receivers_code_03": "035230000",
+                      "date_04": "20180327",
+                      "time_05": "013134",
+                      "group_control_number_06": "575103",
+                      "responsible_agency_code_07": "accredited_standards_committee_x12_X",
+                      "version_release_industry_identifier_code_08": "004010"
+                    },
+                    "transaction_sets": [
+                      {
+                        "set": "940",
+                        "heading": {
+                          "transaction_set_header_ST": {
+                            "transaction_set_identifier_code_01": "940",
+                            "transaction_set_control_number_02": "0001"
+                          },
+                          "shipping_order_identification_W05": {
+                            "order_status_code_01": "original_N",
+                            "depositor_order_number_02": "0080215659",
+                            "purchase_order_number_03": "4000207344"
+                          },
+                          "name_N1_loop": [
+                            {
+                              "name_N1": {
+                                "entity_identifier_code_01": "ship_from_SF",
+                                "name_02": "American Company, Inc.",
+                                "identification_code_qualifier_03": "assigned_by_seller_or_sellers_agent_91",
+                                "identification_code_04": "3010"
+                              },
+                              "additional_name_information_N2": [
+                                {
+                                  "name_01": "3PL CHICAGO, CN"
+                                }
+                              ],
+                              "geographic_location_N4": {
+                                "city_name_01": "CHICAGO",
+                                "state_or_province_code_02": "020",
+                                "country_code_04": "CN"
+                              }
+                            },
+                            {
+                              "name_N1": {
+                                "entity_identifier_code_01": "ship_to_ST",
+                                "name_02": "Atlanta Technology",
+                                "identification_code_qualifier_03": "assigned_by_seller_or_sellers_agent_91",
+                                "identification_code_04": "0002965161"
+                              },
+                              "additional_name_information_N2": [
+                                {
+                                  "name_01": "Co Ltd",
+                                  "name_02": "B2-1-2,"
+                                },
+                                {
+                                  "name_01": "{{street}}, {{city}}"
+                                }
+                              ],
+                              "address_information_N3": [
+                                {
+                                  "address_information_01": "{{street}}"
+                                }
+                              ],
+                              "geographic_location_N4": {
+                                "city_name_01": "{{city}}",
+                                "state_or_province_code_02": "{{state}}",
+                                "postal_code_03": "{{zip}}",
+                                "country_code_04": "{{country}}"
+                              },
+                              "administrative_communications_contact_PER": [
+                                {
+                                  "contact_function_code_01": "general_contact_CN",
+                                  "communication_number_qualifier_05": "facsimile_FX",
+                                  "communication_number_06": "010-63340122"
+                                }
+                              ]
+                            },
+                            {
+                              "name_N1": {
+                                "entity_identifier_code_01": "bill_to_party_BT",
+                                "name_02": "Atlanta Technology",
+                                "identification_code_qualifier_03": "assigned_by_seller_or_sellers_agent_91",
+                                "identification_code_04": "0002908712"
+                              },
+                              "additional_name_information_N2": [
+                                {
+                                  "name_01": "Comp Ltd",
+                                  "name_02": "Rom0852, 4 unit, 12F, No 7 Building,"
+                                }
+                              ],
+                              "address_information_N3": [
+                                {
+                                  "address_information_01": "No 7 Harvard Street"
+                                }
+                              ],
+                              "geographic_location_N4": {
+                                "city_name_01": "Chicago",
+                                "state_or_province_code_02": "010",
+                                "postal_code_03": "100190",
+                                "country_code_04": "CN"
+                              },
+                              "administrative_communications_contact_PER": [
+                                {
+                                  "contact_function_code_01": "general_contact_CN",
+                                  "communication_number_qualifier_05": "facsimile_FX",
+                                  "communication_number_06": "010-58947727"
+                                }
+                              ]
+                            }
+                          ],
+                          "reference_identification_N9": [
+                            {
+                              "reference_identification_qualifier_01": "delivery_reference_KK",
+                              "reference_identification_02": "LF"
+                            },
+                            {
+                              "reference_identification_qualifier_01": "mutually_defined_ZZ",
+                              "reference_identification_02": "DDP",
+                              "free_form_description_03": "CHICAGO"
+                            },
+                            {
+                              "reference_identification_qualifier_01": "connecting_carrier_ZC",
+                              "reference_identification_02": "06"
+                            }
+                          ],
+                          "contact_G61": [
+                            {
+                              "contact_function_code_01": "delivery_contact_DC",
+                              "name_02": "Atlanta Technology",
+                              "communication_number_qualifier_03": "telephone_TE"
+                            }
+                          ],
+                          "date_time_G62": [
+                            {
+                              "date_qualifier_01": "requested_ship_date_pick_up_date_10",
+                              "date_02": "20180328"
+                            },
+                            {
+                              "date_qualifier_01": "delivery_requested_on_this_date_02",
+                              "date_02": "20180327"
+                            }
+                          ],
+                          "warehouse_carrier_information_W66": {
+                            "shipment_method_of_payment_01": "prepaid_local_collect_outstate_PL",
+                            "transportation_method_type_code_02": "mutually_defined_ZZ",
+                            "standard_carrier_alpha_code_10": "CALL"
+                          }
+                        },
+                        "detail": {
+                          "assigned_number_LX_loop": [
+                            {
+                              "assigned_number_LX": {
+                                "assigned_number_01": "1"
+                              },
+                              "line_item_detail_warehouse_W01_loop": [
+                                {
+                                  "line_item_detail_warehouse_W01": {
+                                    "quantity_ordered_01": "2",
+                                    "unit_or_basis_for_measurement_code_02": "piece_PC",
+                                    "upc_case_code_03": "000619002280",
+                                    "product_service_id_qualifier_04": "vendors_sellers_item_number_VN",
+                                    "product_service_id_05": "E000169"
+                                  },
+                                  "line_item_detail_description_G69": [
+                                    {
+                                      "free_form_description_01": "ET1929LM-7BOO-1-WH-G"
+                                    }
+                                  ],
+                                  "reference_identification_N9": [
+                                    {
+                                      "reference_identification_qualifier_01": "line_item_identifier_sellers_LI",
+                                      "reference_identification_02": "000010"
+                                    },
+                                    {
+                                      "reference_identification_qualifier_01": "serial_number_SE",
+                                      "reference_identification_02": "X"
+                                    },
+                                    {
+                                      "reference_identification_qualifier_01": "customer_order_number_CO",
+                                      "reference_identification_02": "CS13237"
+                                    },
+                                    {
+                                      "reference_identification_qualifier_01": "storage_information_code_1R",
+                                      "reference_identification_02": "FGI"
+                                    },
+                                    {
+                                      "reference_identification_qualifier_01": "mutually_defined_ZZ",
+                                      "reference_identification_02": "CN"
+                                    },
+                                    {
+                                      "reference_identification_qualifier_01": "account_category_9X",
+                                      "reference_identification_02": "TAN"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "summary": {
+                          "total_shipping_order_W76": {
+                            "quantity_ordered_01": "2",
+                            "weight_02": "0",
+                            "unit_or_basis_for_measurement_code_03": "kilogram_KG"
+                          },
+                          "transaction_set_trailer_SE": {
+                            "number_of_included_segments_01": "34",
+                            "transaction_set_control_number_02": "0001"
+                          }
+                        }
+                      }
+                    ],
+                    "functional_group_trailer_GE": {
+                      "number_of_transaction_sets_included_01": "1",
+                      "group_control_number_02": "575103"
+                    },
+                    "release": "004010"
+                  }
+                ],
+                "interchange_control_trailer_IEA": {
+                  "number_of_included_functional_groups_01": "1",
+                  "interchange_control_number_02": "000575103"
+                },
+                "delimiters": {
+                  "element": "*",
+                  "segment": "~",
+                  "sub_element": "^"
+                }
+              }
+            ],
+            "__version": "jedi@2.0"
+              
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

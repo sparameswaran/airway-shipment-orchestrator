@@ -8,33 +8,57 @@ Parameters:
     Type: String
     Description: 'Name of the AWS SQS queue to be created'
     Default: ShipmentRecordQueue
+  ShipmentRecordManualResubmitQueueName:
+    Type: String
+    Description: Name of the AWS SQS Manual resubmit queue to be created
+    Default: ShipmentRecordManualResubmitQueue
+  ShipmentRecordDLQueueName:
+    Type: String
+    Description: Name of the AWS SQS DeadLetter queue to be created
+    Default: ShipmentRecordDLQueue
   ShipmentRecordTableName:
     Type: String
-    Description: 'Name of the AWS DynamoDB Table for storing the shipment records to be created'
+    Description: 'Name of the AWS DynamoDB Table for storing the shipment records'
     Default: ShipmentRecord
   ShipmentHashTableName:
     Type: String
-    Description: 'Name of the AWS DynamoDB Table for storing the shipment hashes to be created'
+    Description: 'Name of the AWS DynamoDB Table for storing the shipment hashes'
     Default: ShipmentHash
-
+  AirwaysShipmentDetailTableName:
+    Type: String
+    Description: 'Name of the AWS DynamoDB Table for storing the Airways shipment labels'
+    Default: AirwaysShipmentDetail
+  UPSShipmentTrackingTableName:
+    Type: String
+    Description: 'Name of the AWS DynamoDB Table for storing the UPS shipment tracking'
+    Default: UPSTracking
+  
 Resources:
+  ShipmentRecordDLQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref ShipmentRecordDLQueueName
   ShipmentRecordQueue:
     Type: AWS::SQS::Queue
     Properties:
-      Name: !Ref ShipmentRecordQueueName
-    ShipmentRecordDLQueue:
-      Type: AWS::SQS::Queue
-      Properties:
-        Name: !Join ["", [ !Ref ShipmentRecordQueueName, "-DLQ" ] ]
+      QueueName: !Ref ShipmentRecordQueueName
+      VisibilityTimeout: 300
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ShipmentRecordDLQueue.Arn
+        maxReceiveCount: 5
+  ShipmentRecordManualResubmitQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref ShipmentRecordManualResubmitQueueName
+      VisibilityTimeout: 300
 
-  ShipmentHashDynamoDBTable:
+
+  ShipmentHashDDB:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Ref ShipmentHashTableName
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: wasProcessed
-          AttributeType: BOOL
         - AttributeName: addrHashCode
           AttributeType: S
       KeySchema:
@@ -43,17 +67,13 @@ Resources:
       Tags:
         - Key: Name
           Value: ShipmentHashTable
-  ShipmentRecordDynamoDBTable:
+  ShipmentRecordDDB:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Ref ShipmentRecordTableName
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: recordId
-          AttributeType: S
-        - AttributeName: body
-          AttributeType: S
-        - AttributeName: processTime
           AttributeType: S
         - AttributeName: addrHashCode
           AttributeType: S
@@ -64,7 +84,36 @@ Resources:
           KeyType: RANGE
       Tags:
         - Key: Name
-          Value: ShipmentHashTable
+          Value: ShipmentRecordTable
+  AirwaysShipmentDetailDDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref AirwaysShipmentDetailTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: shipmentRecordID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: shipmentRecordID
+          KeyType: HASH
+      Tags:
+        - Key: Name
+          Value: AirwaysShipmentDetail
+  UPSTrackingDDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref UPSShipmentTrackingTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: upsTracker
+          AttributeType: S
+      KeySchema:
+        - AttributeName: upsTracker
+          KeyType: HASH
+      Tags:
+        - Key: Name
+          Value: UPSShipmentTracking
+        
 
   StepFunctionRole:
     Type: AWS::IAM::Role
@@ -122,20 +171,14 @@ Resources:
               - Effect: Allow
                 Action:
                 # For Lambda invocations
-                - "lambda:InvokeFunction"
-                Resource: [
-                  !GetAtt BatchJobSubmitFunction.Arn,
-                  !GetAtt CallbackNotifyFunction.Arn
-                ]
-              - Effect: Allow
-                Action:
-                # For Lambda invocations
                 - "sqs:Get*"
                 - "sqs:List*"
                 - "sqs:Send*"
                 - "sqs:Receive*"
+                - "sqs:Delete*"
                 Resource: [
                   !GetAtt ShipmentRecordQueue.Arn,
+                  !GetAtt ShipmentRecordManualResubmitQueue.Arn,
                   !GetAtt ShipmentRecordDLQueue.Arn
                 ]
         - PolicyName: DDBReadWrite
@@ -153,10 +196,55 @@ Resources:
                   - dynamodb:Query
                   - dynamodb:Scan
                 Resource: [
-                  !GetAtt ShipmentHashDynamoDBTable.Arn,
-                  !GetAtt ShipmentRecordDynamoDBTable.Arn
+                  !GetAtt ShipmentHashDDB.Arn,
+                  !GetAtt ShipmentRecordDDB.Arn,
+                  !GetAtt AirwaysShipmentDetailDDB.Arn,
+                  !GetAtt UPSTrackingDDB.Arn
                 ]
-
+        - PolicyName: LambdaInvoke
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:                
+              - Effect: Allow
+                Action:
+                # For Lambda invocations
+                - "lambda:InvokeFunction"
+                Resource: 
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*
+  
+  ApiGatewayExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "apigateway.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+      - arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess
+      Policies:
+        - PolicyName: APIGatewayPostToSQS
+          PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                  # For Queue operations
+                  - "sqs:Get*"
+                  - "sqs:List*"
+                  - "sqs:Send*"
+                  Resource: [
+                      !GetAtt ShipmentRecordQueue.Arn,
+                      !GetAtt ShipmentRecordManualResubmitQueue.Arn,
+                      !GetAtt ShipmentRecordDLQueue.Arn
+                    ]    
+                  
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -188,8 +276,10 @@ Resources:
                   - dynamodb:Query
                   - dynamodb:Scan
                 Resource: [
-                  !GetAtt ShipmentHashDynamoDBTable.Arn,
-                  !GetAtt ShipmentRecordDynamoDBTable.Arn
+                  !GetAtt ShipmentHashDDB.Arn,
+                  !GetAtt ShipmentRecordDDB.Arn,
+                  !GetAtt AirwaysShipmentDetailDDB.Arn,
+                  !GetAtt UPSTrackingDDB.Arn
                 ]
               - Effect: Allow
                 Action:
@@ -214,33 +304,44 @@ Resources:
                     - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:*
               - Effect: Allow
                 Action:
-                # For Lambda invocations
+                # For Queue operations
                 - "sqs:Get*"
                 - "sqs:List*"
                 - "sqs:Send*"
                 - "sqs:Receive*"
+                - "sqs:Delete*"
                 Resource: [
                   !GetAtt ShipmentRecordQueue.Arn,
+                  !GetAtt ShipmentRecordManualResubmitQueue.Arn,
                   !GetAtt ShipmentRecordDLQueue.Arn
                 ]
 
+
   OrderValidatorFunction:
     Type: AWS::Serverless::Function
-    DependsOn: LambdaExecutionRole
+    DependsOn: [ LambdaExecutionRole, ShipmentRecordQueue ]
     Properties:
+      FunctionName: OrderValidatorFunction
       CodeUri: functions/order_validator/
       Handler: validator.lambda_handler
       Runtime: python3.9
-      Timeout: 200
+      Timeout: 300
       Environment:
         Variables:
           BUSINESS_VALIDATION_STEPFUNCTION: !GetAtt BusinessValidationStateMachine1.Arn
       Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        ShipmentRecordSQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ShipmentRecordQueue.Arn
+            BatchSize: 10
 
   AirwayShipmentGeneratorFunction:
     Type: AWS::Serverless::Function
     DependsOn: LambdaExecutionRole
     Properties:
+      FunctionName: AirwayShipmentGeneratorFunction
       CodeUri: functions/airway_shipment_generator/
       Handler: app.lambda_handler
       Runtime: python3.9
@@ -248,65 +349,72 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Environment:
         Variables:
-          SHIPMENT_RECORD_TABLE: !GetAtt ShipmentRecordDynamoDBTable.TableName
+          SHIPMENT_RECORD_TABLE: !Ref ShipmentRecordDDB
 
   ShipmentAddressGrouperFunction:
     Type: AWS::Serverless::Function
     DependsOn: LambdaExecutionRole
     Properties:
+      FunctionName: ShipmentAddressGrouperFunction
       CodeUri: functions/shipment_address_grouper/
       Handler: shipment_grouper.lambda_handler
       Runtime: python3.9
-      Timeout: 25
+      Timeout: 300
       Role: !GetAtt LambdaExecutionRole.Arn
       Environment:
         Variables:
-          SHIPMENT_HASH_TABLE: !GetAtt ShipmentHashDynamoDBTable.TableName
+          SHIPMENT_HASH_TABLE: !Ref ShipmentHashDDB
 
 
   UPSShipperFunction:
     Type: AWS::Serverless::Function
     DependsOn: LambdaExecutionRole
     Properties:
+      FunctionName: UPSShipperFunction
       CodeUri: functions/ups_shipper/
       Handler: ups_app.lambda_handler
       Runtime: python3.9
-      Timeout: 25
+      Timeout: 30
       Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          SIMULATE: True
 
   InventoryHandlerFunction:
     Type: AWS::Serverless::Function
     DependsOn: LambdaExecutionRole
     Properties:
+      FunctionName: InventoryHandlerFunction
       CodeUri: functions/inventory_handler/
       Handler: inventory_app.lambda_handler
       Runtime: python3.9
-      Timeout: 25
+      Timeout: 30
       Role: !GetAtt LambdaExecutionRole.Arn
 
   SupplierHandlerFunction:
     Type: AWS::Serverless::Function
     DependsOn: LambdaExecutionRole
     Properties:
+      FunctionName: SupplierHandlerFunction
       CodeUri: functions/supplier_handler/
       Handler: supplier_app.lambda_handler
       Runtime: python3.9
-      Timeout: 25
+      Timeout: 30
       Role: !GetAtt LambdaExecutionRole.Arn
-
 
 
   SAWBProcessorStateMachine3:
     Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
     Properties:
+      Name: SAWBProcessorStateMachine3
       DefinitionUri: statemachine/sawbprocessing_step_function.asl.json
       Role: !GetAtt StepFunctionRole.Arn
       DefinitionSubstitutions:
-        ShipmentHashTable: !GetAtt ShipmentHashDynamoDBTable.TableName
-        ShipmentRecordTable: !GetAtt ShipmentRecordDynamoDBTable.TableName
+        ShipmentHashTable: !Ref ShipmentHashDDB
+        ShipmentRecordTable: !Ref ShipmentRecordDDB
         BusinessRulesValidatorLambdaArn: !GetAtt OrderValidatorFunction.Arn
-        ShipmentQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !Ref ShipmentRecordQueueName ] ]
-        ShipmentDLQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !GetAtt ShipmentRecordDLQueue.Name ] ]
+        ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
+        ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName  ] ]
         SAWBHandler: !GetAtt AirwayShipmentGeneratorFunction.Arn
         InventoryHandler: !GetAtt InventoryHandlerFunction.Arn
         SupplierHandler: !GetAtt SupplierHandlerFunction.Arn
@@ -316,34 +424,71 @@ Resources:
     Type: AWS::Serverless::StateMachine
     #DependsOn: [ ]
     Properties:
+      Name: AggregationKickoffStateMachine2
       DefinitionUri: statemachine/aggregation_kickoff_step_function.asl.json
       Role: !GetAtt StepFunctionRole.Arn
       DefinitionSubstitutions:
         SWABProcessorStepFunction: !GetAtt SAWBProcessorStateMachine3.Arn
         ShipmentAddressGrouperFunction: !GetAtt ShipmentAddressGrouperFunction.Arn
-        ShipmentQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !Ref ShipmentRecordQueueName ] ]
-        ShipmentDLQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !GetAtt ShipmentRecordDLQueue.Name ] ]
-
+        ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
+        ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName ] ]
+        
   BusinessValidationStateMachine1:
     Type: AWS::Serverless::StateMachine
     Properties:
+      Name: BusinessValidationStateMachine1
       DefinitionUri: statemachine/business_validation_step_function.asl.json
       Role: !GetAtt StepFunctionRole.Arn
       DefinitionSubstitutions:
-        ShipmentHashTable: !GetAtt ShipmentHashDynamoDBTable.TableName
-        ShipmentRecordTable: !GetAtt ShipmentRecordDynamoDBTable.TableName
-        BusinessRulesValidatorLambdaArn: !GetAtt OrderValidatorFunction.Arn
-        ShipmentQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !Ref ShipmentRecordQueueName ] ]
-        ShipmentDLQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", ${AWS::AccountId}, !GetAtt ShipmentRecordDLQueue.Name ] ]
+        ShipmentHashTable: !Ref ShipmentHashDDB
+        ShipmentRecordTable: !Ref ShipmentRecordDDB
+        ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
+        ShipmentManualResubmitQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordManualResubmitQueueName  ] ]
+        ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName  ] ]
 
-
+  AirwaysShipmentApi:
+    Type: AWS::Serverless::Api
+    EndpointConfiguration: REGIONAL
+    Properties:
+      Name: AirwaysShipmentRestApi
+      StageName: dev
+      OpenApiVersion: '2.0'
+      DefinitionBody:
+        swagger: '2.0'
+        info:
+          version: '2021-10-29T14:45:50Z'
+          title: AirwaysShipmentRest
+        schemes:
+        - https
+        paths:
+          "/postShipment":
+            post:
+              consumes:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    "$ref": "#/definitions/Empty"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                credentials: !GetAtt ApiGatewayExecutionRole.Arn
+                uri:  !Join ["/", [!Sub "arn:aws:apigateway:${AWS::Region}:sqs:path/${AWS::AccountId}", !Ref ShipmentRecordQueueName ] ]
+                responses:
+                  default:
+                    statusCode: '200'
+                requestParameters:
+                  integration.request.header.Content-Type: "'application/x-www-form-urlencoded'"
+                requestTemplates:
+                  application/json: "Action=SendMessage&MessageBody=$input.body"
+                passthroughBehavior: "when_no_templates"
+                type: "aws"
+          
+          
 Outputs:
   ShipmentRecordQueue:
     Description: Shipment Record Queue for processing of shipments
-    Value: !GetAtt ShipmentRecordQueue.Name
-  ShipmentRecordDLQueue:
-    Description: Shipment Record Dead Letter Queue (DLQ) for error/poison messages
-    Value: !GetAtt ShipmentRecordDLQueue.Name
+    Value: !Ref ShipmentRecordQueueName
   BusinessValidatorStepFunction:
     Value: !Ref BusinessValidationStateMachine1
     Description: Name of the Business validation step function
@@ -353,3 +498,6 @@ Outputs:
   SAWBProcessorStepFunction:
     Value: !Ref SAWBProcessorStateMachine3
     Description: Name of the SAWB Processor step function
+  AirwaysShipmentApi:
+    Value: !Ref AirwaysShipmentApi
+    Description: API Endpoint for submission of the inventory shipment orders  

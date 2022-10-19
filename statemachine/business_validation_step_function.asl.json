@@ -17,7 +17,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::dynamodb:putItem",
       "Parameters": {
-        "TableName": "${ShipmentHashTable}",
+        "TableName": "ShipmentHash",
         "Item": {
           "addrHashCode": {
             "S.$": "$.input.hashdata.hashcode"
@@ -34,7 +34,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::dynamodb:putItem",
       "Parameters": {
-        "TableName": "${ShipmentRecordTable}",
+        "TableName": "ShipmentRecord",
         "Item": {
           "addrHashCode": {
             "S.$": "$.input.hashdata.hashcode"
@@ -58,39 +58,17 @@
         {
           "Variable": "$.input.error",
           "IsPresent": true,
-          "Next": "Modify Payload"
+          "Next": "Send to Manual correction/resubmits"
         }
       ],
-      "Default": "Send to Manual correction/resubmits"
+      "Default": "Send to Error Queue"
     },
-    "Modify Payload": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "OutputPath": "$.Payload",
-      "Parameters": {
-        "Payload.$": "$",
-        "FunctionName": "${BusinessRulesValidatorLambdaArn}"
-      },
-      "Retry": [
-        {
-          "ErrorEquals": [
-            "Lambda.ServiceException",
-            "Lambda.AWSLambdaException",
-            "Lambda.SdkClientException"
-          ],
-          "IntervalSeconds": 2,
-          "MaxAttempts": 6,
-          "BackoffRate": 2
-        }
-      ],
-      "Next": "Resubmit valid payload"
-    },
-    "Resubmit valid payload": {
+    "Send to Error Queue": {
       "Type": "Task",
       "Resource": "arn:aws:states:::sqs:sendMessage",
       "Parameters": {
         "MessageBody.$": "$",
-        "QueueUrl": "${ShipmentQueueUrl}"
+        "QueueUrl": "https://sqs.us-east-1.amazonaws.com/523933434461/ShipmentRecordDLQueue"
       },
       "End": true
     },
@@ -99,7 +77,7 @@
       "Resource": "arn:aws:states:::sqs:sendMessage",
       "Parameters": {
         "MessageBody.$": "$",
-        "QueueUrl": "${ShipmentDLQueueUrl}"
+        "QueueUrl": "https://sqs.${AWS::Region}.amazonaws.com/523933434461/ShipmentRecordManualResubmitQueue"
       },
       "End": true
     }
