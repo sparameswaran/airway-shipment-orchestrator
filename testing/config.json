@@ -5,7 +5,7 @@
       { "duration": 1, "arrivalRate": 20 }
     ],
     "payload": {
-      "path": "./2repeatingaddresses.csv",
+      "path": "./200-addresses.csv",
       "fields": ["street", "city", "state", "zip", "country"],
       "options": {
         "delimiter": ","
@@ -17,9 +17,9 @@
       "flow": [
         {
           "post": {
-            "url": "/dev/postShipment", 
+            "url": "/dev/postShipment",
             "json": {
-                      
+
             "interchanges": [
               {
                 "interchange_control_header_ISA": {
@@ -273,7 +273,7 @@
               }
             ],
             "__version": "jedi@2.0"
-              
+
             }
           }
         }
