@@ -32,7 +32,7 @@ Parameters:
     Type: String
     Description: 'Name of the AWS DynamoDB Table for storing the UPS shipment tracking'
     Default: UPSTracking
-  
+
 Resources:
   ShipmentRecordDLQueue:
     Type: AWS::SQS::Queue
@@ -113,7 +113,7 @@ Resources:
       Tags:
         - Key: Name
           Value: UPSShipmentTracking
-        
+
 
   StepFunctionRole:
     Type: AWS::IAM::Role
@@ -204,14 +204,14 @@ Resources:
         - PolicyName: LambdaInvoke
           PolicyDocument:
             Version: 2012-10-17
-            Statement:                
+            Statement:
               - Effect: Allow
                 Action:
                 # For Lambda invocations
                 - "lambda:InvokeFunction"
-                Resource: 
+                Resource:
                   - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*
-  
+
   ApiGatewayExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -243,8 +243,8 @@ Resources:
                       !GetAtt ShipmentRecordQueue.Arn,
                       !GetAtt ShipmentRecordManualResubmitQueue.Arn,
                       !GetAtt ShipmentRecordDLQueue.Arn
-                    ]    
-                  
+                    ]
+
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -413,6 +413,7 @@ Resources:
         ShipmentHashTable: !Ref ShipmentHashDDB
         ShipmentRecordTable: !Ref ShipmentRecordDDB
         BusinessRulesValidatorLambdaArn: !GetAtt OrderValidatorFunction.Arn
+        AirwayShipmentGeneratorFunctionArn: !GetAtt AirwayShipmentGeneratorFunction.Arn
         ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
         ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName  ] ]
         SAWBHandler: !GetAtt AirwayShipmentGeneratorFunction.Arn
@@ -432,7 +433,7 @@ Resources:
         ShipmentAddressGrouperFunction: !GetAtt ShipmentAddressGrouperFunction.Arn
         ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
         ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName ] ]
-        
+
   BusinessValidationStateMachine1:
     Type: AWS::Serverless::StateMachine
     Properties:
@@ -483,8 +484,8 @@ Resources:
                   application/json: "Action=SendMessage&MessageBody=$input.body"
                 passthroughBehavior: "when_no_templates"
                 type: "aws"
-          
-          
+
+
 Outputs:
   ShipmentRecordQueue:
     Description: Shipment Record Queue for processing of shipments
@@ -500,4 +501,4 @@ Outputs:
     Description: Name of the SAWB Processor step function
   AirwaysShipmentApi:
     Value: !Ref AirwaysShipmentApi
-    Description: API Endpoint for submission of the inventory shipment orders  
+    Description: API Endpoint for submission of the inventory shipment orders

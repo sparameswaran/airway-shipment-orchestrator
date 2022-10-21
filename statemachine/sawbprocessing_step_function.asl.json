@@ -11,7 +11,7 @@
       "ResultPath": "$.AirwayBill",
       "Parameters": {
         "Payload.$": "$",
-        "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:AirwayShipmentGeneratorFunction"
+        "FunctionName": "${SAWBHandler}"
       },
       "Retry": [
         {
@@ -59,7 +59,7 @@
       "ResultPath": "$.InventoryResult",
       "Parameters": {
         "Payload.$": "$",
-        "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:InventoryHandlerFunction"
+        "FunctionName": "${InventoryHandler}"
       },
       "Retry": [
         {
@@ -86,13 +86,13 @@
       ],
       "Default": "GoWithSupplier"
     },
-    "GoWithSupplier": {
+    "ReplaceSupplier": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "OutputPath": "$.Payload",
       "Parameters": {
         "Payload.$": "$",
-        "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:airway-shipment-SupplierHandlerFunction-EzmFjjWPqbQB"
+        "FunctionName": "${SupplierHandler}"
       },
       "Retry": [
         {
@@ -143,7 +143,7 @@
             "ResultPath": "$.UPSShipment",
             "Parameters": {
               "Payload.$": "$",
-              "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:UPSShipperFunction"
+              "FunctionName": "${UPSShipperService}"
             },
             "Retry": [
               {
@@ -163,7 +163,7 @@
           "Save UPSTracker": {
             "Type": "Task",
             "Resource": "arn:aws:states:::dynamodb:putItem",
-            "ResultPath": null,   
+            "ResultPath": null,
             "Parameters": {
               "TableName": "UPSTracking",
               "Item": {
@@ -198,8 +198,8 @@
                   "AddressHash.$": "$.AddressHash",
                   "AirwayShipmentID.$": "$.ShipmentCode",
                   "ShipmentRecordId.$": "$.Shipment.recordId",
-                  "UPSTrackerID.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode" 
-            },            
+                  "UPSTrackerID.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode"
+            },
             "ResultPath" : "$.myResultParameters",
             "OutputPath": "$.myResultParameters",
             "End": true
@@ -207,12 +207,12 @@
         }
       },
       "End": true,
-      "ItemsPath": "$.AirwayBill.AirwayBill.shipment_entries",      
+      "ItemsPath": "$.AirwayBill.AirwayBill.shipment_entries",
       "Parameters": {
         "Shipment.$": "$$.Map.Item.Value",
         "AddressHash.$": "$.addrHashCode",
         "ShipmentCode.$": "$.AirwayBill.AirwayBill.sawb_bill_number"
-      },      
+      },
       "MaxConcurrency": 0
     },
     "ReplaceSupplier": {
@@ -221,7 +221,7 @@
       "OutputPath": "$.UPSShippingResponse",
       "Parameters": {
         "Payload.$": "$",
-        "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:SupplierHandlerFunction"
+        "FunctionName": "${SupplierHandler}"
       },
       "Retry": [
         {
