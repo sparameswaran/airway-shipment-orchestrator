@@ -61,6 +61,10 @@ def lambda_handler(event, context):
                 }
 
     airwaybillJson['shipment_entries'] = hashIdsResponse['Items']
+    # remove body from payload as it blows up final response
+    for shipmentEntry in airwaybillJson['shipment_entries']:
+        del shipmentEntry['body']
+        
     airwaybillJson['sawb_bill_number'] = str(uuid.uuid4())
 
     return airwaybillJson

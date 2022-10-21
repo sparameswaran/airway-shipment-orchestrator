@@ -51,7 +51,7 @@ The AirwayShipmentGeneratorFunction generates the airway shipment record while t
 ## Requirements
 
 * SAM CLI (details in Deploy)
-* Needs Python 3.9 available to run the SAM CLI tool.
+* Needs Python 3.9 available to run the SAM CLI tool (refer to https://tecadmin.net/install-python-3-9-on-amazon-linux/ for instructions).
 * Artillery tool to be installed to load test and inject messages into SQS via API Gateway (can be done manually as well). Please refer to [Artillery install](https://www.artillery.io/docs/guides/getting-started/installing-artillery)
 
 
@@ -62,7 +62,7 @@ The Serverless Application Model Command Line Interface (SAM CLI) is an extensio
 To use the SAM CLI, you need the following tools:
 
 * SAM CLI - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
-* [Python 3.9 installed](https://www.python.org/downloads/)
+* [Python 3.9 installed](https://tecadmin.net/install-python-3-9-on-amazon-linux/)
 * Docker - [Install Docker community edition](https://hub.docker.com/search/?type=edition&offering=community)
 
 Note: Docker not really required if there is no local dev/test using sam local option.

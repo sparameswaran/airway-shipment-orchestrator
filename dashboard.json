@@ -1,0 +1,108 @@
+{
+    "widgets": [
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 9,
+            "properties": {
+                "metrics": [
+                    [ "AWS/SQS", "NumberOfMessagesDeleted", "QueueName", "ShipmentRecordQueue" ],
+                    [ ".", "NumberOfMessagesReceived", ".", "." ],
+                    [ ".", "ApproximateNumberOfMessagesVisible", ".", "." ],
+                    [ ".", "NumberOfMessagesSent", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "title": "SQS Stats",
+                "period": 10,
+                "stat": "Average"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 0,
+            "width": 12,
+            "height": 9,
+            "properties": {
+                "metrics": [
+                    [ "AWS/Lambda", "ConcurrentExecutions", "FunctionName", "AirwayShipmentGeneratorFunction" ],
+                    [ ".", "Invocations", ".", "." ],
+                    [ ".", "ConcurrentExecutions", ".", "InventoryHandlerFunction" ],
+                    [ ".", "Invocations", ".", "." ],
+                    [ ".", "ConcurrentExecutions", ".", "OrderValidatorFunction" ],
+                    [ ".", "Invocations", ".", "." ],
+                    [ "...", "UPSShipperFunction" ],
+                    [ ".", "ConcurrentExecutions", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "title": "Lambda CurrentExecutions and Invocations ",
+                "period": 10,
+                "stat": "Sum"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 9,
+            "width": 13,
+            "height": 16,
+            "properties": {
+                "metrics": [
+                    [ "AWS/States", "ExecutionsSucceeded", "StateMachineArn", "arn:aws:states:us-east-1:523933434461:stateMachine:AggregationKickoffStateMachine2" ],
+                    [ ".", "ExecutionsTimedOut", ".", "." ],
+                    [ ".", "ExecutionThrottled", ".", "." ],
+                    [ ".", "ExecutionsAborted", ".", "." ],
+                    [ ".", "ExecutionsStarted", ".", "." ],
+                    [ ".", "ExecutionTime", ".", ".", { "visible": false } ],
+                    [ ".", "ExecutionsFailed", ".", "." ],
+                    [ ".", "ExecutionTime", ".", "arn:aws:states:us-east-1:523933434461:stateMachine:BusinessValidationStateMachine1", { "visible": false } ],
+                    [ ".", "ExecutionsStarted", ".", "." ],
+                    [ ".", "ExecutionThrottled", ".", "." ],
+                    [ ".", "ExecutionsFailed", ".", "." ],
+                    [ ".", "ExecutionsTimedOut", ".", "." ],
+                    [ ".", "ExecutionsAborted", ".", "." ],
+                    [ ".", "ExecutionsSucceeded", ".", "." ],
+                    [ ".", "ExecutionsFailed", ".", "arn:aws:states:us-east-1:523933434461:stateMachine:SAWBProcessorStateMachine3" ],
+                    [ ".", "ExecutionsStarted", ".", "." ],
+                    [ ".", "ExecutionsTimedOut", ".", "." ],
+                    [ ".", "ExecutionsAborted", ".", "." ],
+                    [ ".", "ExecutionThrottled", ".", "." ],
+                    [ ".", "ExecutionsSucceeded", ".", "." ],
+                    [ ".", "ExecutionTime", ".", ".", { "visible": false } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "period": 30,
+                "title": "State Machine Execution Stats",
+                "stat": "Sum"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 13,
+            "y": 9,
+            "width": 10,
+            "height": 10,
+            "properties": {
+                "metrics": [
+                    [ "AWS/DynamoDB", "ReturnedItemCount", "TableName", "UPSTracking", "Operation", "Scan" ],
+                    [ "...", "AirwaysShipmentDetail", ".", "Query" ],
+                    [ "...", "ShipmentRecord", ".", "." ],
+                    [ "...", "ShipmentHash", ".", "Scan" ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "period": 60,
+                "stat": "Average"
+            }
+        }
+    ]
+}
