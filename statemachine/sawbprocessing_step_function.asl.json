@@ -86,7 +86,7 @@
       ],
       "Default": "GoWithSupplier"
     },
-    "ReplaceSupplier": {
+    "GoWithSupplier": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "OutputPath": "$.Payload",
