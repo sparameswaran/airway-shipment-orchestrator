@@ -16,6 +16,8 @@ def lambda_handler(event, context):
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(tableName)
     hashIdsResponse = table.query(
+        # Remove body from payload as it blows up final response
+        ProjectionExpression="processTime,recordId,addrHashCode",
         KeyConditionExpression="addrHashCode = :hash",
         ExpressionAttributeValues={ ':hash' : hashKey }
 
@@ -60,11 +62,10 @@ def lambda_handler(event, context):
                 	"amt_of_insurance": "$1500"
                 }
 
+
     airwaybillJson['shipment_entries'] = hashIdsResponse['Items']
-    # remove body from payload as it blows up final response
-    for shipmentEntry in airwaybillJson['shipment_entries']:
-        del shipmentEntry['body']
-        
+
+
     airwaybillJson['sawb_bill_number'] = str(uuid.uuid4())
 
     return airwaybillJson
