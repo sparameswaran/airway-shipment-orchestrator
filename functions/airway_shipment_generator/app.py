@@ -14,15 +14,14 @@ def lambda_handler(event, context):
     tableName = SHIPMENT_RECORD_TABLE
     hashKey = event['addrHashCode']
     dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(tableName)
-    hashIdsResponse = table.query(
-        # Remove body from payload as it blows up final response
-        ProjectionExpression="processTime,recordId,addrHashCode",
-        KeyConditionExpression="addrHashCode = :hash",
-        ExpressionAttributeValues={ ':hash' : hashKey }
-
-    )
-    print(hashIdsResponse)
+    # table = dynamodb.Table(tableName)
+    # hashIdsResponse = table.query(
+    #     # Remove body from payload as it blows up final response
+    #     ProjectionExpression="processTime,recordId,addrHashCode",
+    #     KeyConditionExpression="addrHashCode = :hash",
+    #     ExpressionAttributeValues={ ':hash' : hashKey }
+    # )
+    # print(hashIdsResponse)
 
     airwaybillJson = {
                 	"sawb_bill_number": "933-13232-20239239",
@@ -63,7 +62,7 @@ def lambda_handler(event, context):
                 }
 
 
-    airwaybillJson['shipment_entries'] = hashIdsResponse['Items']
+    #airwaybillJson['shipment_entries'] = hashIdsResponse['Items']
 
 
     airwaybillJson['sawb_bill_number'] = str(uuid.uuid4())

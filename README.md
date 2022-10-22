@@ -122,7 +122,7 @@ Steps:
   curl -X POST -H 'Content-Type: application/json' https://<AirwaysShipmentApiEndpoint>/dev/postShipment -d @sampleShippingPayload.json
   ```
 
-* Start the tests using `runArtillery.sh` script or just run `artillery run config.json`
+* Start the tests from the `testing folder` using `./runArtillery.sh` script or just run `artillery run config.json`
 Whenever making changes to the code or SAM templates, rerun the sam build followed by sam deploy.
 
 ## Cleanup

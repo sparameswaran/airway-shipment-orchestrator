@@ -1,0 +1,96 @@
+{
+  "Comment": "UPS Shipment handler state machine",
+  "StartAt": "UPS Shipment Invoke",
+  "States":   {
+    "UPS Shipment Invoke": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "ResultPath": "$.UPSShipment",
+            "Parameters": {
+              "Payload.$": "$",
+              "FunctionName": "${UPSShipperService}"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "States.TaskFailed",
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException"
+                ],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 6,
+                "BackoffRate": 2
+              }
+            ],
+            "Next": "Save UPSTracker"
+          },
+    "Save UPSTracker": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:putItem",
+            "ResultPath": null,
+            "Parameters": {
+              "TableName": "${UPSTrackingTable}",
+              "Item": {
+                "addrHashCode": {
+                  "S.$": "$.AddressHash"
+                },
+                "shipmentCode": {
+                  "S.$": "$.ShipmentCode"
+                },
+                "shipmentRecordId": {
+                  "S.$": "$.Shipment.recordId.S"
+                },
+                "upsTracker": {
+                  "S.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode"
+                },
+                "upsShipmentResponse": {
+                  "S.$": "States.JsonToString($.UPSShipment.Payload.UPSShipmentTracker.ShipmentResponse)"
+                },
+                "associatedShipmentDetail": {
+                  "S.$": "States.JsonToString($.UPSShipment.Payload.ShipmentRequest)"
+                },
+                "processTime": {
+                  "S.$": "$$.State.EnteredTime"
+                }
+              }
+            },
+            "Next": "Update Shipment Record with UPS Tracker"
+          },
+          "Update Shipment Record with UPS Tracker": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:updateItem",
+            "ResultPath": null,
+            "Parameters": {
+              "TableName": "${ShipmentRecordTable}",
+              "Key": {
+                "addrHashCode": {
+                  "S.$": "$.AddressHash"
+                },
+                "recordId": {
+                  "S.$": "$.Shipment.recordId.S"
+                }
+              },
+              "UpdateExpression": "SET upsTracker = :myValueRef",
+              "ExpressionAttributeValues": {
+                ":myValueRef": {
+                  "S.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode"
+                }
+              }
+            },
+            "Next": "Save Results of SAWB and UPS"
+          },
+          "Save Results of SAWB and UPS": {
+            "Type": "Pass",
+            "Parameters": {
+              "AddressHash.$": "$.AddressHash",
+              "AirwayShipmentID.$": "$.ShipmentCode",
+              "ShipmentRecordId.$": "$.Shipment.recordId.S",
+              "UPSTrackerID.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode"
+            },
+            "ResultPath": "$.myResultParameters",
+            "OutputPath": "$.myResultParameters",
+            "End": true
+          }
+        }
+}

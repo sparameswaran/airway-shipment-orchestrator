@@ -11,7 +11,7 @@
       "ResultPath": "$.AirwayBill",
       "Parameters": {
         "Payload.$": "$",
-        "FunctionName": "${SAWBHandler}"
+        "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:AirwayShipmentGeneratorFunction"
       },
       "Retry": [
         {
@@ -32,7 +32,7 @@
       "Resource": "arn:aws:states:::dynamodb:putItem",
       "ResultPath": null,
       "Parameters": {
-        "TableName": "${AirwaysShipmentTable}",
+        "TableName": "AirwaysShipmentDetail",
         "Item": {
           "addrHashCode": {
             "S.$": "$.addrHashCode"
@@ -59,7 +59,7 @@
       "ResultPath": "$.InventoryResult",
       "Parameters": {
         "Payload.$": "$",
-        "FunctionName": "${InventoryHandler}"
+        "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:InventoryHandlerFunction"
       },
       "Retry": [
         {
@@ -92,7 +92,7 @@
       "OutputPath": "$.Payload",
       "Parameters": {
         "Payload.$": "$",
-        "FunctionName": "${SupplierHandler}"
+        "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:SupplierHandlerFunction"
       },
       "Retry": [
         {
@@ -113,7 +113,7 @@
       "Resource": "arn:aws:states:::dynamodb:updateItem",
       "ResultPath": "$.GroupShipmentHashUpdate",
       "Parameters": {
-        "TableName": "${ShipmentHashTable}",
+        "TableName": "ShipmentHash",
         "Key": {
           "addrHashCode": {
             "S.$": "$.addrHashCode"
@@ -135,7 +135,7 @@
       "Type": "Task",
       "Next": "Map",
       "Parameters": {
-        "TableName": "${ShipmentRecordTable}",
+        "TableName": "ShipmentRecord",
         "ProjectionExpression": "processTime,recordId,addrHashCode",
         "ExpressionAttributeValues": {
           ":addrHash": {
@@ -151,20 +151,96 @@
     "Map": {
       "Type": "Map",
       "Iterator": {
-        "StartAt": "UPS Shipment Handling using Child Step Function",
+        "StartAt": "UPS Shipment Invoke",
         "States": {
-          "UPS Shipment Handling using Child Step Function": {
+          "UPS Shipment Invoke": {
             "Type": "Task",
-            "Resource": "arn:aws:states:::states:startExecution.sync:2",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "ResultPath": "$.UPSShipment",
             "Parameters": {
-              "StateMachineArn": "${UPSShipmentHandlerStepFunction}",
-              "Input": {
-                "Shipment.$": "$.Shipment",
-                "AddressHash.$": "$.AddressHash",
-                "ShipmentCode.$": "$.ShipmentCode",
-                "AWS_STEP_FUNCTIONS_STARTED_BY_EXECUTION_ID.$": "$$.Execution.Id"
+              "Payload.$": "$",
+              "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:UPSShipperFunction"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "States.TaskFailed",
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException"
+                ],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 6,
+                "BackoffRate": 2
+              }
+            ],
+            "Next": "Save UPSTracker"
+          },
+          "Save UPSTracker": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:putItem",
+            "ResultPath": null,
+            "Parameters": {
+              "TableName": "UPSTracking",
+              "Item": {
+                "addrHashCode": {
+                  "S.$": "$.AddressHash"
+                },
+                "shipmentCode": {
+                  "S.$": "$.ShipmentCode"
+                },
+                "shipmentRecordId": {
+                  "S.$": "$.Shipment.recordId.S"
+                },
+                "upsTracker": {
+                  "S.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode"
+                },
+                "upsShipmentResponse": {
+                  "S.$": "States.JsonToString($.UPSShipment.Payload.UPSShipmentTracker.ShipmentResponse)"
+                },
+                "associatedShipmentDetail": {
+                  "S.$": "States.JsonToString($.UPSShipment.Payload.ShipmentRequest)"
+                },
+                "processTime": {
+                  "S.$": "$$.State.EnteredTime"
+                }
               }
             },
+            "Next": "Update Shipment Record with UPS Tracker"
+          },
+          "Update Shipment Record with UPS Tracker": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:updateItem",
+            "ResultPath": null,
+            "Parameters": {
+              "TableName": "ShipmentRecord",
+              "Key": {
+                "addrHashCode": {
+                  "S.$": "$.AddressHash"
+                },
+                "recordId": {
+                  "S.$": "$.Shipment.recordId.S"
+                }
+              },
+              "UpdateExpression": "SET upsTracker = :myValueRef",
+              "ExpressionAttributeValues": {
+                ":myValueRef": {
+                  "S.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode"
+                }
+              }
+            },
+            "Next": "Save Results of SAWB and UPS"
+          },
+          "Save Results of SAWB and UPS": {
+            "Type": "Pass",
+            "Parameters": {
+              "AddressHash.$": "$.AddressHash",
+              "AirwayShipmentID.$": "$.ShipmentCode",
+              "ShipmentRecordId.$": "$.Shipment.recordId.S",
+              "UPSTrackerID.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode"
+            },
+            "ResultPath": "$.myResultParameters",
+            "OutputPath": "$.myResultParameters",
             "End": true
           }
         }
@@ -176,6 +252,7 @@
         "ShipmentCode.$": "$.AirwayBill.AirwayBill.sawb_bill_number"
       },
       "ResultPath": "$.ProcessedRecords",
+
       "MaxConcurrency": 0,
       "Next": "Check if additional untracked Shipment records exist"
     },
@@ -196,7 +273,7 @@
       "Type": "Task",
       "Next": "Map",
       "Parameters": {
-        "TableName": "${ShipmentRecordTable}",
+        "TableName": "ShipmentRecord",
         "ProjectionExpression": "processTime,recordId,addrHashCode",
         "ExpressionAttributeValues": {
           ":addrHash": {
@@ -220,7 +297,7 @@
       "OutputPath": "$.UPSShippingResponse",
       "Parameters": {
         "Payload.$": "$",
-        "FunctionName": "${SupplierHandler}"
+        "FunctionName": "arn:aws:lambda:us-east-1:523933434461:function:SupplierHandlerFunction"
       },
       "Retry": [
         {
