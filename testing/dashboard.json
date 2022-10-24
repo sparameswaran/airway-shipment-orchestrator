@@ -1,32 +1,54 @@
 {
     "widgets": [
         {
-            "type": "metric",
-            "x": 0,
+            "height": 6,
+            "width": 6,
             "y": 0,
-            "width": 12,
-            "height": 9,
+            "x": 0,
+            "type": "metric",
+            "properties": {
+                "metrics": [
+                    [ "AWS/ApiGateway", "Count", "ApiName", "AirwaysShipmentRestApi" ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "<AWS_REGION>",
+                "period": 30,
+                "stat": "Sum",
+                "title": "API Gateway Invocations"
+            }
+        },
+        {
+            "height": 6,
+            "width": 10,
+            "y": 0,
+            "x": 6,
+            "type": "metric",
             "properties": {
                 "metrics": [
                     [ "AWS/SQS", "NumberOfMessagesDeleted", "QueueName", "ShipmentRecordQueue" ],
                     [ ".", "NumberOfMessagesReceived", ".", "." ],
                     [ ".", "ApproximateNumberOfMessagesVisible", ".", "." ],
-                    [ ".", "NumberOfMessagesSent", ".", "." ]
+                    [ ".", "NumberOfMessagesSent", ".", "." ],
+                    [ ".", "NumberOfMessagesDeleted", ".", "ShipmentCarrierQueue" ],
+                    [ ".", "NumberOfMessagesSent", ".", "." ],
+                    [ ".", "NumberOfMessagesReceived", ".", "." ],
+                    [ ".", "ApproximateNumberOfMessagesVisible", ".", "." ]
                 ],
                 "view": "timeSeries",
                 "stacked": false,
-                "region": "us-east-1",
+                "region": "<AWS_REGION>",
                 "title": "SQS Stats",
                 "period": 10,
                 "stat": "Sum"
             }
         },
         {
-            "type": "metric",
-            "x": 12,
-            "y": 0,
-            "width": 12,
             "height": 9,
+            "width": 12,
+            "y": 6,
+            "x": 12,
+            "type": "metric",
             "properties": {
                 "metrics": [
                     [ "AWS/Lambda", "ConcurrentExecutions", "FunctionName", "AirwayShipmentGeneratorFunction" ],
@@ -40,56 +62,49 @@
                 ],
                 "view": "timeSeries",
                 "stacked": false,
-                "region": "us-east-1",
+                "region": "<AWS_REGION>",
                 "title": "Lambda CurrentExecutions and Invocations ",
                 "period": 10,
                 "stat": "Sum"
             }
         },
         {
-            "type": "metric",
+            "height": 9,
+            "width": 12,
+            "y": 6,
             "x": 0,
-            "y": 9,
-            "width": 13,
-            "height": 16,
+            "type": "metric",
             "properties": {
                 "metrics": [
-                    [ "AWS/States", "ExecutionsSucceeded", "StateMachineArn", "arn:aws:states:us-east-1:523933434461:stateMachine:AggregationKickoffStateMachine2" ],
-                    [ ".", "ExecutionsTimedOut", ".", "." ],
-                    [ ".", "ExecutionThrottled", ".", "." ],
+                    [ "AWS/States", "ExecutionsSucceeded", "StateMachineArn", "arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:stateMachine:AggregationKickoffStateMachine2" ],
                     [ ".", "ExecutionsAborted", ".", "." ],
                     [ ".", "ExecutionsStarted", ".", "." ],
-                    [ ".", "ExecutionTime", ".", ".", { "visible": false } ],
                     [ ".", "ExecutionsFailed", ".", "." ],
-                    [ ".", "ExecutionTime", ".", "arn:aws:states:us-east-1:523933434461:stateMachine:BusinessValidationStateMachine1", { "visible": false } ],
+                    [ ".", "ExecutionsSucceeded", ".", "arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:stateMachine:BusinessValidationStateMachine1", { "visible": false } ],
                     [ ".", "ExecutionsStarted", ".", "." ],
                     [ ".", "ExecutionThrottled", ".", "." ],
                     [ ".", "ExecutionsFailed", ".", "." ],
-                    [ ".", "ExecutionsTimedOut", ".", "." ],
                     [ ".", "ExecutionsAborted", ".", "." ],
-                    [ ".", "ExecutionsSucceeded", ".", "." ],
-                    [ ".", "ExecutionsFailed", ".", "arn:aws:states:us-east-1:523933434461:stateMachine:SAWBProcessorStateMachine3" ],
+                    [ ".", "ExecutionsFailed", ".", "arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:stateMachine:SAWBProcessorStateMachine3" ],
                     [ ".", "ExecutionsStarted", ".", "." ],
-                    [ ".", "ExecutionsTimedOut", ".", "." ],
                     [ ".", "ExecutionsAborted", ".", "." ],
-                    [ ".", "ExecutionThrottled", ".", "." ],
-                    [ ".", "ExecutionsSucceeded", ".", "." ],
-                    [ ".", "ExecutionTime", ".", ".", { "visible": false } ]
+                    [ ".", "ExecutionsSucceeded", ".", "." ]
+
                 ],
                 "view": "timeSeries",
                 "stacked": false,
-                "region": "us-east-1",
+                "region": "<AWS_REGION>",
                 "period": 30,
                 "title": "State Machine Execution Stats",
                 "stat": "Sum"
             }
         },
         {
+            "height": 6,
+            "width": 8,
+            "y": 0,
+            "x": 16,
             "type": "metric",
-            "x": 13,
-            "y": 9,
-            "width": 10,
-            "height": 10,
             "properties": {
                 "metrics": [
                     [ "AWS/DynamoDB", "ReturnedItemCount", "TableName", "UPSTracking", "Operation", "Scan" ],
@@ -99,7 +114,7 @@
                 ],
                 "view": "timeSeries",
                 "stacked": false,
-                "region": "us-east-1",
+                "region": "<AWS_REGION>",
                 "period": 30,
                 "stat": "Sum"
             }

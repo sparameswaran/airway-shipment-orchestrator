@@ -1,8 +1,8 @@
 {
   "config": {
-    "target": "https://<API_GATEWAY_ENDPOINT>.amazonaws.com",
+    "target": "https://<EDIT_ME_WITH_API_GATEWAY_ENDPOINT>.amazonaws.com",
     "phases": [
-      { "name": "Generate Shipment requests", "duration": 5, "arrivalRate": 20 }
+      { "name": "Generate Shipment requests", "duration": 1, "arrivalRate": 20 }
     ],
     "payload": {
       "path": "./200-addresses.csv",

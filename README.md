@@ -5,10 +5,10 @@ This sample project demonstrates orchestration using AWS Serverless components (
 ##  Project structure
 The project contains source code and supporting files that you can deploy with the SAM CLI. It includes the following files and folders:
 
-- functions - AWS Lambda functions to handle processing of shipments requests from SQS and integration with various backend systems (including UPS shipping api).
-- statemachines - Definition for the AWS Step Functions that orchestrates the complex workflow of managing multiple Lambda and nested AWS child Step Functions.
-- template.yaml - A SAM template that defines the application's AWS resources.
-- testing - folder that contains artillery test configuration script for injecting requests into the system.
+* functions - AWS Lambda functions to handle processing of shipments requests from SQS and integration with various backend systems (including UPS shipping api).
+* statemachines - Definition for the AWS Step Functions that orchestrates the complex workflow of managing multiple Lambda and nested AWS child Step Functions.
+* template.yaml - A SAM template that defines the application's AWS resources.
+* testing - folder that contains artillery test configuration script for injecting requests into the system.
 
 ## Architecture
 
@@ -40,6 +40,8 @@ High level architecture is shown below:
 
 ### DynamoDB Tables
 
+All the below tables are configured with on-demand capacity to handle large throughput requirements to handle heavy concurrent read/writes.
+
 * `ShipmentHash` contains unique shipment destinations. It uses a hash based on address as DynamoDB Hash Key along with an additional portion comprised of date and a random partition as Sort key to spread repeated addresses.
 
 * `ShipmentRecord` contains the indivivdual shipment records submitted. It uses the address + date + partition as its Hash key and the record as sort key. It would also contain the UPS tracker id once the carrrier has generated the tracker id.
@@ -55,9 +57,9 @@ High level architecture is shown below:
 
 * `OrderValidationFunction` AWS Lambda Function consumes the shipment records from the `ShipmentRecordQueue` (submitted manually or via API Gateway integration) SQS Queue and validates the records before kicking off the `BusinessValidationStateMachine` for further processing per record.
 
-* `AirwayShipmentGeneratorFunction` generates the airway shipment record while the Inventory/Supplier act as minor functions for generating actual inventory and supplier information while the UPSShipperFunction simulates the actual UPS service. Real UPS service can be used (with valid API Client ID and Secret tokens) but the requests would be throttled for a test account and so it was decided to go with simulated response.
+* `AirwayShipmentGeneratorFunction` generates the airway shipment record while the Inventory/Supplier act as minor functions for generating actual inventory and supplier information while the UPSShipperFunction simulates the actual UPS service. Real UPS service can be used (with valid API Client ID and Secret tokens) but the requests would be throttled for a test account and so it simulates the response.
 
-* `ShipmentAddressGrouperFunction` and `ShipmentAddressDateGrouperFunction` are functions to lookup shipments by jsut destination address or along with the random partition that have not been assocaited with a carrier.
+* `ShipmentAddressGrouperFunction` and `ShipmentAddressDateGrouperFunction` are functions to lookup shipments by just destination address or along with the random partition that have not been assocaited with a carrier.
 
 * `UPSShipperFunction` is the UPS shipment handler function invoking UPS. Due to rate limits, it simulates the UPS Shipping response rather than actually hitting the UPS shipping endpoint. To truly invoke UPS, edit the environment variable `SIMULATE` to `false`, and also edit the client API ID and Secret and related Shipper Account Number with valid entries before redeploying the function.
 
@@ -75,7 +77,7 @@ High level architecture is shown below:
   * `SAWBProcessorStateMachine3` handles generation of the Airway Shipment Bill using Lambda function `AirwayShipmentGeneratorFunction` (the shipment bill gets saved in `AirwaysShipmentDetail` table in DynamoDB) and then checks if inventory is available for that shipment for default supplier and switches the supplier as necessary before passing to another Map step that iterates over the individual shipment entries that are being sent via UPS to the same address.
   * For each shipment, a message is published to the `ShipmentCarrierTopic` Topic that allows the actual carrier to handle the shipping. The Topic publishes to `ShipmentCarrierQueue` which gets picked by a lambda that in turn triggers UPS Carrier Shipping related workflow service.
   * `UPSShipmentHandlerStateMachine5` gets invoked to handle the Airways shipment bill and record, calls the UPS service and the results get saved in `UPSTracking` table.
-  * All the Shipment records with associated UPS or other carrier shipment labels are saved in DynamoDB `ShipmentRecord` table. There is a separate `UPSTracking` table that has the individual tracker id along with related shipping record id.
+  * All the Shipment records with associated UPS or other carrier shipment labels are saved in DynamoDB `ShipmentRecord` table. There is a separate `UPSTracking` table that has the individual tracker id along with related shipping record id. Heavy writes and reads in DynamoDB can result in throttling as DynamoDB atempts to scale the table (when using on-demand capacity). Code attempts to retry with increasing backoff rates.
 * Any repeat submissions to the Aggregation Step Function for an already processed address will return with no operations.
 
 ## Requirements
@@ -135,16 +137,16 @@ Steps:
 * Edit the target and load testing configurations in config.json file
 ```
 "config": {
-  "target": "https://EDIT_ME_.execute-api.us-east-1.amazonaws.com",
+  "target": "https://<EDIT_ME_WITH_API_GATEWAY_ENDPOINT>.amazonaws.com",
   "phases": [
-    { "duration": 1, "arrivalRate": 20 }
+    { "name": "Generate Shipment requests", "duration": 1, "arrivalRate": 20 }
   ],
   ....
 ```
   Edit the target to the API endpoint created at end of the SAM template deployment (without /dev or other stage name)
   Edit the `arrivalRate` to be small for initial testing (controls how many requests to submit in a given second)
-  The duration parameter indicates how long to run the test. Can bump this up. Total requests would be arrival rate * duration.
-  The shipment payload to be dynamically submitted with addresses specified in the sample 200-addresses.csv file.
+  The duration parameter indicates how long to run the test which can be bumped up. Total number of submitted requests would be equal to (arrival rate * duration).
+  The shipment payload would be dynamically substituted with addresses specified in the sample 200-addresses.csv file.
   Its also possible to submit a request directly to API Gateway endpoint using curl and a sample payload:
   ```bash
   cd testing
@@ -154,6 +156,11 @@ Steps:
 
 * Start the tests from the `testing folder` using `./runArtillery.sh` script or just run `artillery run config.json`
 Whenever making changes to the code or SAM templates, rerun the sam build followed by sam deploy.
+
+## Monitoring
+
+Use CloudWatch Dashboard to monitor the various metrics emitted from API Gateway, SQS, Lambda, DynamoDB, Step Functions. Create a new dashboard in CloudWatch and just add a sample widgets for any metric. Then use the sample `testing/dashboard.json` template (edit the AWS_REGION and AWS_ACCOUNT_ID with valid actual values) to replace the newly created dashboard with customized one using the `Actions` -> `View/edit source` option in Dashboard.
+![](imgs/Dashboard.png)
 
 ## Cleanup
 

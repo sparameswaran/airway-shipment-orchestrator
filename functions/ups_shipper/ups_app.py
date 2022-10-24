@@ -286,7 +286,7 @@ def simulatedResponse(event):
                 "UPSShipmentTracker":  shippingLabelResponse,
                 "ShipmentRequest": event
               }
-	time.sleep(0.1*random.randrange(5))
+	time.sleep(0.1*random.randrange(8))
 	return response
 
 

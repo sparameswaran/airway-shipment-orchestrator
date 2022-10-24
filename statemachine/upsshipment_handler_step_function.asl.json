@@ -1,28 +1,18 @@
 {
   "Comment": "UPS Shipment handler state machine",
-<<<<<<< HEAD
   "StartAt": "Map",
   "States": {
     "Map": {
       "Type": "Map",
       "Iterator": {
-          "StartAt": "UPS Shipment Invoke",         
+          "StartAt": "UPS Shipment Invoke",
         "States": {
         "UPS Shipment Invoke": {
-=======
-  "StartAt": "UPS Shipment Invoke",
-  "States":   {
-    "UPS Shipment Invoke": {
->>>>>>> 23486f0de65963becdf35afcb0339f828bf907f6
             "Type": "Task",
             "Resource": "arn:aws:states:::lambda:invoke",
             "ResultPath": "$.UPSShipment",
             "Parameters": {
-<<<<<<< HEAD
               "Payload.$": "$.Payload",
-=======
-              "Payload.$": "$",
->>>>>>> 23486f0de65963becdf35afcb0339f828bf907f6
               "FunctionName": "${UPSShipperService}"
             },
             "Retry": [
@@ -33,16 +23,11 @@
                   "Lambda.AWSLambdaException",
                   "Lambda.SdkClientException"
                 ],
-<<<<<<< HEAD
                 "IntervalSeconds": 1,
-=======
-                "IntervalSeconds": 2,
->>>>>>> 23486f0de65963becdf35afcb0339f828bf907f6
                 "MaxAttempts": 6,
                 "BackoffRate": 2
               }
             ],
-<<<<<<< HEAD
             "Next": "Reformat Parameters"
           },
           "Reformat Parameters": {
@@ -56,13 +41,8 @@
             "ResultPath": "$.DerivedParams",
             "Next": "Save UPSTracker"
           },
-          
+
           "Save UPSTracker": {
-=======
-            "Next": "Save UPSTracker"
-          },
-    "Save UPSTracker": {
->>>>>>> 23486f0de65963becdf35afcb0339f828bf907f6
             "Type": "Task",
             "Resource": "arn:aws:states:::dynamodb:putItem",
             "ResultPath": null,
@@ -70,7 +50,6 @@
               "TableName": "${UPSTrackingTable}",
               "Item": {
                 "addrHashCode": {
-<<<<<<< HEAD
                   "S.$": "$.Payload.AddressHash"
                 },
                 "addrDateHash": {
@@ -90,44 +69,23 @@
                 },
                 "associatedShipmentDetail": {
                   "S.$": "States.JsonToString($.DerivedParams.UPSShipmentRequest)"
-=======
-                  "S.$": "$.AddressHash"
-                },
-                "shipmentCode": {
-                  "S.$": "$.ShipmentCode"
-                },
-                "shipmentRecordId": {
-                  "S.$": "$.Shipment.recordId.S"
-                },
-                "upsTracker": {
-                  "S.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode"
-                },
-                "upsShipmentResponse": {
-                  "S.$": "States.JsonToString($.UPSShipment.Payload.UPSShipmentTracker.ShipmentResponse)"
-                },
-                "associatedShipmentDetail": {
-                  "S.$": "States.JsonToString($.UPSShipment.Payload.ShipmentRequest)"
->>>>>>> 23486f0de65963becdf35afcb0339f828bf907f6
                 },
                 "processTime": {
                   "S.$": "$$.State.EnteredTime"
                 }
               }
             },
-<<<<<<< HEAD
             "Retry": [
               {
                 "ErrorEquals": [
                   "States.TaskFailed"
                 ],
                 "BackoffRate": 2,
-                "IntervalSeconds": 1,
-                "MaxAttempts": 6,
+                "IntervalSeconds": 2,
+                "MaxAttempts": 15,
                 "Comment": "Retry DDB inserts/updates"
               }
             ],
-=======
->>>>>>> 23486f0de65963becdf35afcb0339f828bf907f6
             "Next": "Update Shipment Record with UPS Tracker"
           },
           "Update Shipment Record with UPS Tracker": {
@@ -137,25 +95,16 @@
             "Parameters": {
               "TableName": "${ShipmentRecordTable}",
               "Key": {
-<<<<<<< HEAD
                 "addrDateHash": {
                   "S.$": "$.Payload.AddressDateHash"
                 },
                 "recordId": {
                   "S.$": "$.DerivedParams.ShipmentRecordId"
-=======
-                "addrHashCode": {
-                  "S.$": "$.AddressHash"
-                },
-                "recordId": {
-                  "S.$": "$.Shipment.recordId.S"
->>>>>>> 23486f0de65963becdf35afcb0339f828bf907f6
                 }
               },
               "UpdateExpression": "SET upsTracker = :myValueRef",
               "ExpressionAttributeValues": {
                 ":myValueRef": {
-<<<<<<< HEAD
                   "S.$": "$.DerivedParams.UPSTrackerID"
                 }
               }
@@ -166,8 +115,8 @@
                   "States.TaskFailed"
                 ],
                 "BackoffRate": 2,
-                "IntervalSeconds": 1,
-                "MaxAttempts": 6,
+                "IntervalSeconds": 2,
+                "MaxAttempts": 15,
                 "Comment": "Retry DDB inserts/updates"
               }
             ],
@@ -180,25 +129,3 @@
     }
   }
 }
-=======
-                  "S.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode"
-                }
-              }
-            },
-            "Next": "Save Results of SAWB and UPS"
-          },
-          "Save Results of SAWB and UPS": {
-            "Type": "Pass",
-            "Parameters": {
-              "AddressHash.$": "$.AddressHash",
-              "AirwayShipmentID.$": "$.ShipmentCode",
-              "ShipmentRecordId.$": "$.Shipment.recordId.S",
-              "UPSTrackerID.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode"
-            },
-            "ResultPath": "$.myResultParameters",
-            "OutputPath": "$.myResultParameters",
-            "End": true
-          }
-        }
-}
->>>>>>> 23486f0de65963becdf35afcb0339f828bf907f6
