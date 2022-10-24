@@ -22,7 +22,7 @@ High level architecture is shown below:
 ![](imgs/BusinessValidationStateMachine1.png)
 
 * `AggregationKickoffStateMachine2` that would aggregate the orders based on destination address for further processing once the batch of shipments have been all validated. This has to be kicked off manually once we know the batch of shipment records has been validated and saved. For each unique shipment address in the batch, an instance of `SAWBProcessorStateMachine3` would be created using Step Funtion's Map construct. This invocation has to be done just once per batch with no real inputs required for the AggregationKickoff state machine.
-![](imgs/AggregationKickoffStateMachine2.png){:height="120px" width="100px"}
+<img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/AggregationKickoffStateMachine2.png" width=50% height=50%>
 
 * `SAWBProcessorStateMachine3` that handles Airway shipment generation per unique destination address. Then it starts handling the shipments using a Map construct in Step Functions to handle the individual line items associated with an unique  shipment address and assigned random partition. It takes an input argument of an existing hash of destination addresses partitions.
 ![](imgs/SAWBProcessorStateMachine3.png)
