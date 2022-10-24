@@ -130,7 +130,11 @@ sam deploy --guided
 
 ## Testing
 
-Use artillery to inject sample shipment messages that would be submitted via API Gateway to ShipmentRecordQueue (SQS Queue).
+There are 2 parts to the workflow:
+* Ingestion of shipments via API Gateway -> SQS -> Lambda -> OrderValidationStateMachine1
+* Kick off the aggregation of shipments and related downstream processing (SAWB generation, association of carrier with the shipments etc.)
+
+*1)* To handle the ingestion at scale, use artillery to inject sample shipment messages that would be submitted via API Gateway to ShipmentRecordQueue (SQS Queue).
 Steps:
 
 * Go to the testing folder.
@@ -157,6 +161,13 @@ Steps:
 * Start the tests from the `testing folder` using `./runArtillery.sh` script or just run `artillery run config.json`
 Whenever making changes to the code or SAM templates, rerun the sam build followed by sam deploy.
 
+*2)* To kick off the aggeregation and processing of the shipments, wait for the shipment records to show up in the ShipmentRecord DDB table. There can a few failed records that goes to the ShipmentRecordDLQueue with rest being successfully inserted into ShipmentRecord table. The total ingestion process should be over in one-two minutes once artillery has completed its run. 
+* Once this is verified, go to the `AggregationKickoffStateMachine2` Step Function and start a new execution. This would check the ShipmentRecordQueue for zero available messages indicating all have been ingested to start the actual aggregation.
+* Wait for the AggregationKickoff to complete.
+* Check the `UPSShipmentHandlerStateMachine5` execution stats to see the actual invocation of UPS or other carrier handling the shipping.
+* `UPSTracking` should contain records of ups tracker ids and related shipment record ids while the `ShipmentRecord` table should reflect the updated shipment records with related ups tracker ids.
+* For repeated runs as necessary, clean up the various tables once testing is done using the `DDBTableCleanupHandlerFunction` Lambda function. To speed up clean of very large `ShipmentRecord` and `UPSTracking` tables that can take time, it tries to directly delete and recreate the tables rather than deleting the records. It just deletes the rows only for smaller tables: `ShipmentHash` and `AirwaysShipmentDetail`.
+
 ## Monitoring
 
 Use CloudWatch Dashboard to monitor the various metrics emitted from API Gateway, SQS, Lambda, DynamoDB, Step Functions. Create a new dashboard in CloudWatch and just add a sample widgets for any metric. Then use the sample `testing/dashboard.json` template (edit the AWS_REGION and AWS_ACCOUNT_ID with valid actual values) to replace the newly created dashboard with customized one using the `Actions` -> `View/edit source` option in Dashboard.
@@ -164,13 +175,17 @@ Use CloudWatch Dashboard to monitor the various metrics emitted from API Gateway
 
 ## Cleanup
 
-To delete the sample application that you created, use the AWS CLI. First delete the S3 bucket hosting the batch script. Assuming you used your project name for the stack name, you can run the following:
+For repeated runs as necessary, clean up the various tables once testing is done using the `DDBTableCleanupHandlerFunction` Lambda function. To speed up clean of very large `ShipmentRecord` and `UPSTracking` tables that can take time, it tries to directly delete and recreate the tables rather than deleting the records. It just deletes the rows only for smaller tables: `ShipmentHash` and `AirwaysShipmentDetail`.
+
+To delete the entire application along with resources created, use the AWS CLI. First delete the S3 bucket hosting the batch script. Assuming you used your project name for the stack name, you can run the following:
 
 ```
 bash
 aws s3 rm s3://<airway-shipment-orchestrator-s3bucket> --recursive
 aws cloudformation delete-stack --stack-name <stack-name>
 ```
+
+Delete the DynamoDB tables if these were recreated outside of Cloudformation/SAM CLI manually if necessary.
 
 ## Resources
 
