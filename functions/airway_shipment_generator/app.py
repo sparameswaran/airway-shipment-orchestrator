@@ -63,9 +63,9 @@ def lambda_handler(event, context):
 
 
     #airwaybillJson['shipment_entries'] = hashIdsResponse['Items']
-    airwaybillJson['addrDateHash'] = hashKey + '#' + str(date.today()) 
+    airwaybillJson['addrDateHash'] = hashKey + '#' + str(date.today())
     airwaybillJson['processDate'] = str(date.today())
-    airwaybillJson['processTime'] = str(datetime.now()) 
+    airwaybillJson['processTime'] = str(datetime.now())
     airwaybillJson['sawb_bill_number'] = str(uuid.uuid4())
 
     return airwaybillJson

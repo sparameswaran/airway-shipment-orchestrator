@@ -18,7 +18,7 @@
                 "region": "us-east-1",
                 "title": "SQS Stats",
                 "period": 10,
-                "stat": "Average"
+                "stat": "Sum"
             }
         },
         {
@@ -100,8 +100,8 @@
                 "view": "timeSeries",
                 "stacked": false,
                 "region": "us-east-1",
-                "period": 60,
-                "stat": "Average"
+                "period": 30,
+                "stat": "Sum"
             }
         }
     ]

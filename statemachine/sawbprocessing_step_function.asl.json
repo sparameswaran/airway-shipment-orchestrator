@@ -64,7 +64,7 @@
           "MaxAttempts": 6,
           "Comment": "Retry DDB inserts/updates"
         }
-      ],      
+      ],
       "Next": "Invoke Inventory"
     },
     "Invoke Inventory": {
@@ -178,7 +178,7 @@
       "Iterator": {
         "StartAt": "Handle Shipment by Address Partitions",
         "States": {
-          
+
           "Handle Shipment by Address Partitions": {
             "Type": "Task",
             "Resource": "arn:aws:states:::states:startExecution.sync:2",
@@ -194,7 +194,7 @@
             "ResultPath": "$.ProcessedRecords",
             "Next": "Update ShipmentHash As Processed with ShipmentRecord"
           },
-            
+
           "Update ShipmentHash As Processed with ShipmentRecord": {
             "Type": "Task",
             "Resource": "arn:aws:states:::dynamodb:updateItem",
@@ -208,7 +208,7 @@
                 "addrDateHash": {
                   "S.$": "$.AddressDateHash"
                 }
-              },              
+              },
               "UpdateExpression": "SET wasProcessed = :myValueRef, sawbHash = :sawbHashRef",
               "ExpressionAttributeValues": {
                 ":myValueRef": {
@@ -229,7 +229,7 @@
                 "MaxAttempts": 6,
                 "Comment": "Retry DDB inserts/updates"
               }
-            ],            
+            ],
             "End": true
           }
         }

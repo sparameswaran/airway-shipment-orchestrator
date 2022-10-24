@@ -23,7 +23,7 @@ Parameters:
   ShipmentCarrierQueueName:
     Type: String
     Description: Name of the AWS SQS Queue to handle specific carrier shipments
-    Default: ShipmentCarrierQueue    
+    Default: ShipmentCarrierQueue
   ShipmentRecordTableName:
     Type: String
     Description: 'Name of the AWS DynamoDB Table for storing the shipment records'
@@ -63,7 +63,7 @@ Resources:
     Properties:
       QueueName: !Ref ShipmentRecordManualResubmitQueueName
       VisibilityTimeout: 300
-      
+
   ShipmentCarrierTopic:
     Type: AWS::SNS::Topic
     Properties:
@@ -99,8 +99,8 @@ Resources:
           Condition:
             ArnEquals:
               aws:SourceArn: !Join [ ":", [ !Sub "arn:aws:sns:${AWS::Region}", !Ref AWS::AccountId, !Ref ShipmentCarrierTopicName ] ]
-      
-      
+
+
   ShipmentHashDDB:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -115,7 +115,7 @@ Resources:
         - AttributeName: addrHashCode
           KeyType: HASH
         - AttributeName: addrDateHash
-          KeyType: RANGE  
+          KeyType: RANGE
       Tags:
         - Key: Name
           Value: ShipmentHashTable
@@ -182,7 +182,7 @@ Resources:
               - "sts:AssumeRole"
       Policies:
         - PolicyName: StepFunctionAdditionalPolicy
-          PolicyDocument: 
+          PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
@@ -225,7 +225,7 @@ Resources:
         - PolicyName: DDBInvoke
           PolicyDocument:
             Version: 2012-10-17
-            Statement:                    
+            Statement:
               - Effect: Allow
                 Action:
                   - dynamodb:DescribeTable
@@ -270,7 +270,7 @@ Resources:
                 Resource: [
                   !Ref ShipmentCarrierTopic
                 ]
-      
+
         - PolicyName: LambdaInvoke
           PolicyDocument:
             Version: 2012-10-17
@@ -332,7 +332,7 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
         - PolicyName: DDBReadWrite-CWLogging-StepFunctionExecution
-          PolicyDocument: 
+          PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
@@ -496,7 +496,7 @@ Resources:
           Properties:
             Queue: !GetAtt ShipmentCarrierSubscriberQueue.Arn
             BatchSize: 10
-            
+
   UPSShipperFunction:
     Type: AWS::Serverless::Function
     DependsOn: LambdaExecutionRole
@@ -558,7 +558,7 @@ Resources:
         UPSShipperService: !GetAtt UPSShipperFunction.Arn
         UPSShipperServiceStepFunction: !GetAtt UPSShipmentHandlerStateMachine5.Arn
         ShipmentCarrierSNSTopic: !Ref ShipmentCarrierTopic
-        
+
   SAWBProcessorStateMachine3:
     Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
     Properties:
@@ -571,7 +571,10 @@ Resources:
         UPSTrackingTable: !Ref UPSTrackingDDB
         AirwaysShipmentTable: !Ref AirwaysShipmentDetailDDB
         BusinessRulesValidator: !GetAtt OrderValidatorFunction.Arn
+<<<<<<< HEAD
         ShipmentAddressDateGrouperFunction: !GetAtt ShipmentAddressDateGrouperFunction.Arn
+=======
+>>>>>>> 23486f0de65963becdf35afcb0339f828bf907f6
         ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
         ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName  ] ]
         SAWBHandler: !GetAtt AirwayShipmentGeneratorFunction.Arn
@@ -664,7 +667,7 @@ Outputs:
     Description: Name of the Shipment Partitions Handler step function
   UPSShipmentHandlerStepFunction:
     Value: !Ref UPSShipmentHandlerStateMachine5
-    Description: Name of the UPS Shipment Handler step function    
+    Description: Name of the UPS Shipment Handler step function
   AirwaysShipmentApi:
     Value: !Ref AirwaysShipmentApi
     Description: API Endpoint for submission of the inventory shipment orders
