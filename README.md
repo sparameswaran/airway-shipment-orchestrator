@@ -25,13 +25,13 @@ High level architecture is shown below:
 <img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/AggregationKickoffStateMachine2.png" width=25% height=25%>
 
 * `SAWBProcessorStateMachine3` that handles Airway shipment generation per unique destination address. Then it starts handling the shipments using a Map construct in Step Functions to handle the individual line items associated with an unique  shipment address and assigned random partition. It takes an input argument of an existing hash of destination addresses partitions.
-![](imgs/SAWBProcessorStateMachine3.png)
+<img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/SAWBProcessorStateMachine3.png" width=25% height=25%>
 
 * `ShipmentPartitionHandlerStateMachine4` associates the Airway shipment bill  with the shipment and then fires off a SNS notification for handling by assocaited Carriers. The Carrier Notification SNS topic publishes to a Shipment Carrier Queue. There can be multiple such subscribers for the SNS Topic (UPS, Fedex, USPS etc.) and each carrier workflow to handle the shipments can work at same time in a disconnected manner as the SNS/SQS decouples it from the main aggregation and airway shipment bill assocation from actual carrier logistics.
-![](imgs/ShipmentPartitionHandlerStateMachine4.png)
+<img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/ShipmentPartitionHandlerStateMachine4.png" width=25% height=25%>
 
 * `UPSShipmentHandlerStateMachine5` is the carrier specific workflow to handle the shipments by invoking actual carrier service endpoint and then associating the carrier tracker and response with the shipment.
-![](imgs/UPSShipmentHandlerStateMachine5.png)
+<img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/UPSShipmentHandlerStateMachine5.png" width=25% height=25%>
 
 ### SNS and SQS
 * `ShipmentRecordQueue` is an Amazon SQS (Simple Queue Service) Standard Queue used for ingestion of shipment orders. Messages are published to it via API Gateway `AirwaysShipmentRestApi` endpoint. There is a Dead Letter Queue (DLQ) named `ShipmentRecordDLQueue` for failure handling, along with an additional queue for manual resubmissions: `ShipmentRecordManualResubmitQueue` used by the OrderValidation State machine for error handling.
@@ -49,14 +49,17 @@ High level architecture is shown below:
 * `UPSTracking` contains the UPS Tracker id and associated shipping request/response and the related shipment record id.
 ![](imgs/DynamoDB-Structure.png)
 
-### Key Lambda Functions
- The `OrderValidationFunction` consumes the shipment records from the `ShipmentRecordQueue` (submitted manually or via API Gateway integration) SQS Queue and validates the records before kicking off the `BusinessValidationStateMachine` for further processing per record.
+### Key API Gateway and Lambda Functions
+* `AirwaysShipmentRestAPI` is an AWS APIGateway endpoint that accepts shipment records over a REST endpoint for submission to the `ShipmentRecordQueue` SQS Destination.
+![](imgs/APIGateway-Config.png)
 
-The `AirwayShipmentGeneratorFunction` generates the airway shipment record while the Inventory/Supplier act as minor functions for generating actual inventory and supplier information while the UPSShipperFunction simulates the actual UPS service. Real UPS service can be used (with valid API Client ID and Secret tokens) but the requests would be throttled for a test account and so it was decided to go with simulated response.
+* `OrderValidationFunction` AWS Lambda Function consumes the shipment records from the `ShipmentRecordQueue` (submitted manually or via API Gateway integration) SQS Queue and validates the records before kicking off the `BusinessValidationStateMachine` for further processing per record.
 
-`ShipmentAddressGrouperFunction` and `ShipmentAddressDateGrouperFunction` are functions to lookup shipments by jsut destination address or along with the random partition that have not been assocaited with a carrier.
+* `AirwayShipmentGeneratorFunction` generates the airway shipment record while the Inventory/Supplier act as minor functions for generating actual inventory and supplier information while the UPSShipperFunction simulates the actual UPS service. Real UPS service can be used (with valid API Client ID and Secret tokens) but the requests would be throttled for a test account and so it was decided to go with simulated response.
 
-`UPSShipperFunction` is the UPS shipment handler function invoking UPS. Due to rate limits, it simulates the UPS Shipping response rather than actually hitting the UPS shipping endpoint. To truly invoke UPS, edit the environment variable `SIMULATE` to `false`, and also edit the client API ID and Secret and related Shipper Account Number with valid entries before redeploying the function.
+* `ShipmentAddressGrouperFunction` and `ShipmentAddressDateGrouperFunction` are functions to lookup shipments by jsut destination address or along with the random partition that have not been assocaited with a carrier.
+
+* `UPSShipperFunction` is the UPS shipment handler function invoking UPS. Due to rate limits, it simulates the UPS Shipping response rather than actually hitting the UPS shipping endpoint. To truly invoke UPS, edit the environment variable `SIMULATE` to `false`, and also edit the client API ID and Secret and related Shipper Account Number with valid entries before redeploying the function.
 
 ### Detailed Workflow
 * Airways Shipment system accepts individual shipment requests via an API endpoint (deployed via SAM template) that gets saved as individual messages in `ShipmentRecordQueue` SQS Queue.
