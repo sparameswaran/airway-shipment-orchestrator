@@ -3,10 +3,13 @@ import boto3
 import hashlib
 import io
 import os
+from datetime import date
+import random
 import time
 
 client = boto3.client('stepfunctions')
 stateMachineArn = os.getenv('BUSINESS_VALIDATION_STEPFUNCTION')
+MAX_PARTITION_RANGE = int(os.getenv('MAX_PARTITION_RANGE', 10))
 
 def lambda_handler(event, context):
     print('Incoming Event with number of records: ', len(event['Records']))
@@ -16,18 +19,20 @@ def lambda_handler(event, context):
     response = { }
 
     for record in event['Records']:
+        rawBody = record['body']
         #print('Shipment record:' , record['body'])
-        ediRecord = json.loads(record['body'])
+        ediRecord = json.loads(rawBody)
 
         # Go for the very first interchanges record
         ediRecord = ediRecord['interchanges'][0]
 
-        addrHashcode = calculateHash(ediRecord)
+        addrHashMap = calculateHash(ediRecord)
 
         grpIndex = 0
         transactionSetIndex = 0
         addrSectionIndex = 0
         errors = []
+        hasErrors = False
 
         for group in ediRecord['groups']:
             for transactionSet in group['transaction_sets']:
@@ -51,19 +56,22 @@ def lambda_handler(event, context):
 
         #addrSection = ediRecord['groups'][0]['transaction_sets'][0]['name_N1_loop']['geographic_location_N4']
 
-        ediRecord['hashdata'] = addrHashcode
-        ediRecord['errors'] = errors
+        if 'FAIL' in rawBody.upper():
+            errors.append( { 'code': 'max_length_exceeded', 'message': 'Test Error!! Value length must not exceed 2 for element N4-02', 'field': 'state_or_province_code_02' } )
+            hasErrors = True
+            ediRecord['errors'] = errors
+            
+        ediRecord['addrHash'] = addrHashMap
         ediRecord['recordId'] = record['messageId']
 
         inputPayload = { 'input': ediRecord }
-        stepFunctionName = 'ValidationStateMachine1-' + hashlib.md5(record['body'].encode()).hexdigest() + '-'+ str(time.time())
-
+    
         response = client.start_execution(
             stateMachineArn=stateMachineArn,
-            name=stepFunctionName,
             input= json.dumps(inputPayload)
         )
-        print('Fired off step function: ', stepFunctionName)
+        if hasErrors:
+            print('Fired off step function for Business validation with failure scenario: {}'.format( response['executionArn']))
 
 
     return {
@@ -127,4 +135,6 @@ def calculateHash(ediRecord):
 
     addrEncoded = addrString.encode()
     hashcode = hashlib.md5(addrEncoded).hexdigest()
-    return { 'hashcode': hashcode, 'addrCombo' : addrString }
+    addrDateHash = hashcode + '#' + str(date.today()) + '#' + str(random.randrange(MAX_PARTITION_RANGE))
+        
+    return { 'addrHashCode': hashcode, 'addrCombo' : addrString, 'addrDateHash': addrDateHash }

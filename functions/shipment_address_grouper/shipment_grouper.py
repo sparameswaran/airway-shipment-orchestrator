@@ -1,32 +1,35 @@
 import json
 import boto3
 import os
-from boto3.dynamodb.conditions import Key
-from boto3.dynamodb.conditions import Attr
 
-client = boto3.client('dynamodb')
-SHIPMENT_HASH_TABLE = os.getenv('SHIPMENT_HASH_TABLE')
+tableName = os.getenv('SHIPMENT_HASH_TABLE')
+dynamodb = boto3.resource('dynamodb')
 
-def lambda_handler(event, context):
-    tableName=SHIPMENT_HASH_TABLE
-
-    """
-    response = client.scan(
-        TableName='ShipmentHash',
-        ProjectionExpression='addrHashCode',
-        ExpressionAttributeValues={ ':wasProcessed' : { "BOOL": False } },
-        FilterExpression='wasProcessed = :wasProcessed'
-    )
-    print(response)
-    """
-
-    dynamodb = boto3.resource('dynamodb')
+def findAddressPartitions():
     table = dynamodb.Table(tableName)
     hashIdsResponse = table.scan(
-        ProjectionExpression='addrHashCode',
-        ExpressionAttributeValues={ ':wasProcessed' : False },
-        FilterExpression='wasProcessed = :wasProcessed'
+        ProjectionExpression='addrHashCode,addrDateHash',
+        ExpressionAttributeValues={ ':wasProcessed' : 'true' },
+        FilterExpression='(wasProcessed <> :wasProcessed or attribute_not_exists(wasProcessed) ) and attribute_not_exists(sawbHash) '
     )
     print(hashIdsResponse)
-
     return hashIdsResponse['Items']
+
+def createUniqueList(givenList):
+    uniqueList = []
+    for addrDateHash in givenList:
+        if addrDateHash not in uniqueList:
+            uniqueList.append(addrDateHash)
+    return uniqueList
+
+def findAddressGroups(event, context):
+    addressPartitions = findAddressPartitions()
+    addressList = [d['addrHashCode'] for d in addressPartitions]
+    
+    return createUniqueList(addressList)
+    
+def findAddressByDatePartitions(event, context):
+    addressPartitions = findAddressPartitions()
+    addressList = [d['addrDateHash'] for d in addressPartitions]
+    
+    return createUniqueList(addressList)

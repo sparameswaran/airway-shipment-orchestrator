@@ -1,0 +1,122 @@
+{
+  "Comment": "Handle Shipments by Partitions",
+  "StartAt": "Start query for unprocessed shipment records",
+  "States": {
+    
+"Start query for unprocessed shipment records": {
+      "Type": "Task",
+      "Next": "Map",
+      "Parameters": {
+        "TableName": "${ShipmentRecordTable}",
+        "ProjectionExpression": "processTime,recordId,addrDateHash",
+        "ExpressionAttributeValues": {
+          ":addrDateHash": {
+            "S.$": "$.AddressDateHash"
+          }
+        },
+        "KeyConditionExpression": "addrDateHash = :addrDateHash",
+        "FilterExpression": "attribute_not_exists(upsTracker)"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "ResultPath": "$.UnTrackedShipmentRecords"
+    },
+    "Map": {
+      "Type": "Map",
+      "Iterator": {
+        "StartAt": "Publish Shipment Request via SNS",
+        "States": {
+          "Publish Shipment Request via SNS": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sns:publish",
+              "Parameters": {
+                "TopicArn": "${ShipmentCarrierSNSTopic}",
+                "Message": {
+                  "Shipment.$": "$.Shipment",
+                  "AddressHash.$": "$.AddressHash",
+                  "AddressDateHash.$": "$.AddressDateHash",
+                  "AirwayBillNumber.$": "$.AirwayBillNumber"
+                },
+                "MessageAttributes": {
+                 "Carrier": {
+                   "DataType": "String",
+                   "StringValue": "UPS"
+                 }
+                }
+              },
+              "End": true
+            }
+        }
+      },
+      "ItemsPath": "$.UnTrackedShipmentRecords.Items",
+      "Parameters": {
+        "Shipment.$": "$$.Map.Item.Value",
+        "AddressHash.$": "$.AddressHash",
+        "AddressDateHash.$": "$.AddressDateHash",
+        "AirwayBillNumber.$": "$.AirwayBillNumber"
+      },
+      "ResultPath": "$.ProcessedRecords",
+      "MaxConcurrency": 0,
+      "Next": "Check if additional untracked Shipment records exist"
+    },
+    "Check if additional untracked Shipment records exist": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Not": {
+            "Variable": "$.UnTrackedShipmentRecords.LastEvaluatedKey",
+            "IsPresent": true
+          },
+          "Next": "Get Length of ProcessedRecords"
+        }
+      ],
+      "Default": "Continue query for unprocessed shipment records"
+    },
+    "Continue query for unprocessed shipment records": {
+      "Type": "Task",
+      "Next": "Map",
+      "Parameters": {
+        "TableName": "${ShipmentRecordTable}",
+        "ProjectionExpression": "processTime,recordId,addrDateHash",
+        "ExpressionAttributeValues": {
+          ":addrDateHash": {
+            "S.$": "$.AddressDateHash"
+          }
+        },
+        "KeyConditionExpression": "addrDateHash = :addrDateHash",
+        "ExclusiveStartKey.$": "$.UnTrackedShipmentRecords.LastEvaluatedKey",
+        "FilterExpression": "attribute_not_exists(upsTracker)"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "ResultPath": "$.UnTrackedShipmentRecords"
+    },
+    "Get Length of ProcessedRecords": {
+      "Type": "Pass",
+      "Parameters": {
+        "ProcessedRecordsLen.$": "States.ArrayLength($.ProcessedRecords)"
+      },
+      "ResultPath": "$.ProcessedRecordsLen",
+      "Next": "Check for Outputs in ProcessedRecords"
+    },
+    "Check for Outputs in ProcessedRecords": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.ProcessedRecordsLen.ProcessedRecordsLen",
+          "NumericEquals": 0,
+          "Next": "Pass Outer ProcessedRecords"
+        }
+      ],
+      "Default": "Save Results of ShipmentPartitions"
+    },
+    "Pass Outer ProcessedRecords": {
+      "Type": "Pass",
+      "OutputPath": "$.ProcessedRecords",
+      "End": true
+    },
+    "Save Results of ShipmentPartitions": {
+      "Type": "Pass",
+      "OutputPath": "$.ProcessedRecords[*].Output",
+      "End": true
+    }
+  }
+}

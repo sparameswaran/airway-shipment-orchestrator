@@ -2,8 +2,8 @@ import json
 import boto3
 import os
 import uuid
-from boto3.dynamodb.conditions import Key
-from boto3.dynamodb.conditions import Attr
+from datetime import date
+from datetime import datetime
 
 client = boto3.client('dynamodb')
 SHIPMENT_RECORD_TABLE = os.getenv('SHIPMENT_RECORD_TABLE')
@@ -14,15 +14,14 @@ def lambda_handler(event, context):
     tableName = SHIPMENT_RECORD_TABLE
     hashKey = event['addrHashCode']
     dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(tableName)
-    hashIdsResponse = table.query(
-        # Remove body from payload as it blows up final response
-        ProjectionExpression="processTime,recordId,addrHashCode",
-        KeyConditionExpression="addrHashCode = :hash",
-        ExpressionAttributeValues={ ':hash' : hashKey }
-
-    )
-    print(hashIdsResponse)
+    # table = dynamodb.Table(tableName)
+    # hashIdsResponse = table.query(
+    #     # Remove body from payload as it blows up final response
+    #     ProjectionExpression="processTime,recordId,addrHashCode",
+    #     KeyConditionExpression="addrHashCode = :hash",
+    #     ExpressionAttributeValues={ ':hash' : hashKey }
+    # )
+    # print(hashIdsResponse)
 
     airwaybillJson = {
                 	"sawb_bill_number": "933-13232-20239239",
@@ -63,9 +62,10 @@ def lambda_handler(event, context):
                 }
 
 
-    airwaybillJson['shipment_entries'] = hashIdsResponse['Items']
-
-
+    #airwaybillJson['shipment_entries'] = hashIdsResponse['Items']
+    airwaybillJson['addrDateHash'] = hashKey + '#' + str(date.today()) 
+    airwaybillJson['processDate'] = str(date.today())
+    airwaybillJson['processTime'] = str(datetime.now()) 
     airwaybillJson['sawb_bill_number'] = str(uuid.uuid4())
 
     return airwaybillJson

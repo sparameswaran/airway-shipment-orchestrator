@@ -3,9 +3,9 @@ version = 0.1
 [default.deploy]
 [default.deploy.parameters]
 stack_name = "airway-shipment"
-s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1hihkcmymsrl1"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1xqocum2ghm3p"
 s3_prefix = "airway-shipment"
 region = "us-east-1"
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "ShipmentRecordQueueName=\"ShipmentRecordQueue\" ShipmentRecordManualResubmitQueueName=\"ShipmentRecordManualResubmitQueue\" ShipmentRecordDLQueueName=\"ShipmentRecordDLQueue\" ShipmentRecordTableName=\"ShipmentRecord\" ShipmentHashTableName=\"ShipmentHash\""
+parameter_overrides = "ShipmentRecordQueueName=\"ShipmentRecordQueue\" ShipmentRecordManualResubmitQueueName=\"ShipmentRecordManualResubmitQueue\" ShipmentRecordDLQueueName=\"ShipmentRecordDLQueue\" ShipmentCarrierTopicName=\"ShipmentCarrierTopic\" ShipmentCarrierQueueName=\"ShipmentCarrierQueue\" ShipmentRecordTableName=\"ShipmentRecord\" ShipmentHashTableName=\"ShipmentHash\" AirwaysShipmentDetailTableName=\"AirwaysShipmentDetail\" UPSShipmentTrackingTableName=\"UPSTracking\" MaxSubPartitionsForAddresses=\"10\""
 image_repositories = []

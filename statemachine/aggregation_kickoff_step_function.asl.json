@@ -96,7 +96,7 @@
             "Parameters": {
               "StateMachineArn": "${SWABProcessorStepFunction}",
               "Input": {
-                "addrHashCode.$": "$.addrHashCode",
+                "addrHashCode.$": "$",
                 "AWS_STEP_FUNCTIONS_STARTED_BY_EXECUTION_ID.$": "$$.Execution.Id"
               }
             },
@@ -104,8 +104,14 @@
           }
         }
       },
-      "End": true,
-      "ItemsPath": "$.HashIdList"
+      "Next": "Save Results of Aggregator",
+      "ItemsPath": "$.HashIdList",
+      "ResultPath": "$.ProcessedRecords"
+    },
+    "Save Results of Aggregator": {
+      "Type": "Pass",
+      "OutputPath": "$.ProcessedRecords[*].Output",
+      "End": true
     }
   }
 }

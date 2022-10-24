@@ -2,7 +2,7 @@ import json
 import uuid
 import os
 import time
-
+import random
 import requests
 import requests.auth
 
@@ -11,7 +11,11 @@ import requests.auth
 CLIENT_ID = "EDIT_ME_TEST_CLIENT_ID"
 CLIENT_SECRET = "EDIT_ME_TEST_CLIENT_SECRET"
 REDIRECT_URI = "https://wwwcie.ups.com/api"
+SHIPPER_ACCOUNT_NUMBER = '3R5W45'
 
+# Check if using simulator to avoid actual hits to UPS
+# SIMULATE would put in an artificial time delay under 0.5 seconds
+# using time.sleep(0.1*random.randrange(5))
 USE_SIMULATOR = os.getenv('SIMULATE')
 
 def get_token(code):
@@ -101,7 +105,7 @@ def shipping_label(auth_token):
 								"Number": "1115554758",
 								"Extension": " "
 							},
-							"ShipperNumber": "3R5W45",
+							"ShipperNumber": SHIPPER_ACCOUNT_NUMBER,
 							"FaxNumber": "8002222222",
 							"Address": {
 								"AddressLine": "2311 York Rd",
@@ -145,7 +149,7 @@ def shipping_label(auth_token):
 							"ShipmentCharge": {
 								"Type": "01",
 								"BillShipper": {
-									"AccountNumber": "3R5W45"
+									"AccountNumber": SHIPPER_ACCOUNT_NUMBER
 								}
 							}
 						},
@@ -282,6 +286,7 @@ def simulatedResponse(event):
                 "UPSShipmentTracker":  shippingLabelResponse,
                 "ShipmentRequest": event
               }
+	time.sleep(0.1*random.randrange(5))
 	return response
 
 

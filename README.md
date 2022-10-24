@@ -18,19 +18,29 @@ High level architecture is shown below:
 ![](imgs/AirwaysShipmentWorkflow.png)
 
 There are 3 Step Functions involved in the workflow:
-* `BusinessValidationStateMachine1` initially checks for validation errors and delegates for manual resubmission or error processing or normal processing of valid shipment requests. It saves the individual records and shipment address as a hash in DynamoDB.
-![](imgs/BusinessValidatorStateMachine1.png)
+* `BusinessValidationStateMachine1` initially checks for validation errors and delegates for manual resubmission or error processing or normal processing of valid shipment requests. It creates the address hash based on shipment address along with a random partition hash (as there can be large number of shipments to same destination). It saves the individual records, hashes and shipment address in DynamoDB.
+![](imgs/BusinessValidationStateMachine1.png)
 
-* `AggregationKickoffStateMachine2` that would aggregate the orders based on destination address for further processing once the batch of shipments have been all validated. This has to be kicked off manually once we know the batch of shipment records has been validated and saved. For each unique shipment address in the batch, an instance of `SAWBProcessorStateMachine3` would be created using Step Funtion's Map construct. This invocation has to be done just once per batch with no real inputs required.
+* `AggregationKickoffStateMachine2` that would aggregate the orders based on destination address for further processing once the batch of shipments have been all validated. This has to be kicked off manually once we know the batch of shipment records has been validated and saved. For each unique shipment address in the batch, an instance of `SAWBProcessorStateMachine3` would be created using Step Funtion's Map construct. This invocation has to be done just once per batch with no real inputs required for the AggregationKickoff state machine.
 ![](imgs/AggregationKickoffStateMachine2.png)
 
-* `SAWBProcessorStateMachine3` that handles Airway shipment generation per unique destination address and UPS shipping per line item or shipment record. It uses Map construct in Step Functions to handle the individual line items associated with an unique  shipment address. It takes an input argument of an existing hash of destination address.
+* `SAWBProcessorStateMachine3` that handles Airway shipment generation per unique destination address. Then it starts handling the shipments using a Map construct in Step Functions to handle the individual line items associated with an unique  shipment address and assigned random partition. It takes an input argument of an existing hash of destination addresses.
 ![](imgs/SAWBProcessorStateMachine3.png)
 
-Lambda Functions used by the workflow. The `OrderValidationFunction` consumes the shipment records from the `ShipmentRecordQueue` (submitted manually or via API Gateway integration) SQS Queue and validates the records before kicking off the `BusinessValidationStateMachine` for further processing per record.
+* `ShipmentPartitionHandlerStateMachine4` associates the Airway shipment bill  with the shipment and then fires off a SNS notification for handling by assocaited Carriers. The Carrier Notification SNS topic publishes to a Shipment Carrier Queue. There can be multiple such subscribers for the SNS Topic (UPS, Fedex, USPS etc.) and each carrier workflow to handle the shipments can work at same time in a disconnected manner as the SNS/SQS decouples it from the main aggregation and airway shipment bill assocation from actual carrier logistics.
+![](imgs/ShipmentPartitionHandlerStateMachine4.png)
 
-The AirwayShipmentGeneratorFunction generates the airway shipment record while the Inventory/Supplier act as minor functions for generating actual inventory and supplier information while the UPSShipperFunction simulates the actual UPS service. Real UPS service can be used (with valid API Client ID and Secret tokens) but the requests would be throttled for a test account and so it was decided to go with simulated response.
+* `UPSShipmentHandlerStateMachine5` is the carrier specific workflow to handle the shipments by invoking actual carrier service endpoint and then associating the carrier tracker and response with the shipment.
+![](imgs/UPSShipmentHandlerStateMachine5.png)
 
+### Lambda Functions used by the workflow
+ The `OrderValidationFunction` consumes the shipment records from the `ShipmentRecordQueue` (submitted manually or via API Gateway integration) SQS Queue and validates the records before kicking off the `BusinessValidationStateMachine` for further processing per record.
+
+The `AirwayShipmentGeneratorFunction` generates the airway shipment record while the Inventory/Supplier act as minor functions for generating actual inventory and supplier information while the UPSShipperFunction simulates the actual UPS service. Real UPS service can be used (with valid API Client ID and Secret tokens) but the requests would be throttled for a test account and so it was decided to go with simulated response.
+
+`ShipmentAddressGrouperFunction` and `ShipmentAddressDateGrouperFunction` are functions to lookup shipments by jsut destination address or along with the random partition that have not been assocaited with a carrier.
+
+`UPSShipperFunction` is the UPS shipment handler function invoking UPS. Due to rate limits, it simulates the UPS Shipping response. To truly invoke UPS, edit the environment variable `SIMULATE` to `false`, and also edit the client API ID and Secret and related Shipper Account Number with valid entries before redeploying the function.
 
 ### Detailed Workflow
 * Airways Shipment system accepts individual shipment requests via an API endpoint (deployed via SAM template) that gets saved as individual messages in `ShipmentRecordQueue` SQS Queue.

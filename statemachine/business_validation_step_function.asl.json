@@ -6,7 +6,7 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Variable": "$.input.error",
+          "Variable": "$.input.errors",
           "IsPresent": true,
           "Next": "Choice"
         }
@@ -17,10 +17,13 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::dynamodb:putItem",
       "Parameters": {
-        "TableName": "ShipmentHash",
+        "TableName": "${ShipmentHashTable}",
         "Item": {
           "addrHashCode": {
-            "S.$": "$.input.hashdata.hashcode"
+            "S.$": "$.input.addrHash.addrHashCode"
+          },
+          "addrDateHash": {
+            "S.$": "$.input.addrHash.addrDateHash"
           },
           "wasProcessed": {
             "BOOL": "false"
@@ -28,16 +31,27 @@
         }
       },
       "Next": "Save Shipment Record",
-      "ResultPath": "$.shipmentHashResult"
+      "ResultPath": "$.shipmentHashResult",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 6,
+          "Comment": "Retry DDB inserts/updates"
+        }
+      ]            
     },
     "Save Shipment Record": {
       "Type": "Task",
       "Resource": "arn:aws:states:::dynamodb:putItem",
       "Parameters": {
-        "TableName": "ShipmentRecord",
+        "TableName": "${ShipmentRecordTable}",
         "Item": {
-          "addrHashCode": {
-            "S.$": "$.input.hashdata.hashcode"
+          "addrDateHash": {
+            "S.$": "$.input.addrHash.addrDateHash"
           },
           "recordId": {
             "S.$": "$.input.recordId"
@@ -50,15 +64,26 @@
           }
         }
       },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 6,
+          "Comment": "Retry DDB inserts/updates"
+        }
+      ],            
       "End": true
     },
     "Choice": {
       "Type": "Choice",
       "Choices": [
         {
-          "Variable": "$.input.error",
+          "Variable": "$.input.errors.manualfix",
           "IsPresent": true,
-          "Next": "Send to Manual correction/resubmits"
+          "Next": "Send for Manual correction/resubmits"
         }
       ],
       "Default": "Send to Error Queue"
@@ -72,7 +97,7 @@
       },
       "End": true
     },
-    "Send to Manual correction/resubmits": {
+    "Send for Manual correction/resubmits": {
       "Type": "Task",
       "Resource": "arn:aws:states:::sqs:sendMessage",
       "Parameters": {
