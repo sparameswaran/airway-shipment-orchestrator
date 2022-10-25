@@ -36,10 +36,6 @@ Parameters:
     Type: String
     Description: 'Name of the AWS DynamoDB Table for storing the Airways shipment labels'
     Default: AirwaysShipmentDetail
-  UPSShipmentTrackingTableName:
-    Type: String
-    Description: 'Name of the AWS DynamoDB Table for storing the UPS shipment tracking'
-    Default: UPSTracking
   MaxSubPartitionsForAddresses:
     Type: Number
     Description: 'Max number of sub-partitions for given destination address in DDB'
@@ -151,20 +147,6 @@ Resources:
       Tags:
         - Key: Name
           Value: AirwaysShipmentDetail
-  UPSTrackingDDB:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Ref UPSShipmentTrackingTableName
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: upsTracker
-          AttributeType: S
-      KeySchema:
-        - AttributeName: upsTracker
-          KeyType: HASH
-      Tags:
-        - Key: Name
-          Value: UPSShipmentTracking
 
   StepFunctionRole:
     Type: AWS::IAM::Role
@@ -242,8 +224,7 @@ Resources:
                 Resource: [
                   !GetAtt ShipmentHashDDB.Arn,
                   !GetAtt ShipmentRecordDDB.Arn,
-                  !GetAtt AirwaysShipmentDetailDDB.Arn,
-                  !GetAtt UPSTrackingDDB.Arn
+                  !GetAtt AirwaysShipmentDetailDDB.Arn
                 ]
         - PolicyName: SQS-SNSInvoke
           PolicyDocument:
@@ -351,8 +332,7 @@ Resources:
                 Resource: [
                   !GetAtt ShipmentHashDDB.Arn,
                   !GetAtt ShipmentRecordDDB.Arn,
-                  !GetAtt AirwaysShipmentDetailDDB.Arn,
-                  !GetAtt UPSTrackingDDB.Arn
+                  !GetAtt AirwaysShipmentDetailDDB.Arn
                 ]
               - Effect: Allow
                 Action:
@@ -411,7 +391,6 @@ Resources:
           SHIPMENT_HASH_TABLE: !Ref ShipmentHashDDB
           SHIPMENT_RECORD_TABLE: !Ref  ShipmentRecordDDB
           AIRWAYS_SHIPMENT_TABLE: !Ref AirwaysShipmentDetailDDB
-          UPS_TRACKER_TABLE: !Ref UPSTrackingDDB
       Role: !GetAtt LambdaExecutionRole.Arn
 
   OrderValidatorFunction:
@@ -542,7 +521,6 @@ Resources:
       DefinitionSubstitutions:
         ShipmentHashTable: !Ref ShipmentHashDDB
         ShipmentRecordTable: !Ref ShipmentRecordDDB
-        UPSTrackingTable: !Ref UPSTrackingDDB
         UPSShipperService: !GetAtt UPSShipperFunction.Arn
 
   ShipmentPartitionHandlerStateMachine4:
@@ -554,7 +532,6 @@ Resources:
       DefinitionSubstitutions:
         ShipmentHashTable: !Ref ShipmentHashDDB
         ShipmentRecordTable: !Ref ShipmentRecordDDB
-        UPSTrackingTable: !Ref UPSTrackingDDB
         UPSShipperService: !GetAtt UPSShipperFunction.Arn
         UPSShipperServiceStepFunction: !GetAtt UPSShipmentHandlerStateMachine5.Arn
         ShipmentCarrierSNSTopic: !Ref ShipmentCarrierTopic
@@ -568,7 +545,6 @@ Resources:
       DefinitionSubstitutions:
         ShipmentHashTable: !Ref ShipmentHashDDB
         ShipmentRecordTable: !Ref ShipmentRecordDDB
-        UPSTrackingTable: !Ref UPSTrackingDDB
         AirwaysShipmentTable: !Ref AirwaysShipmentDetailDDB
         BusinessRulesValidator: !GetAtt OrderValidatorFunction.Arn
         ShipmentAddressDateGrouperFunction: !GetAtt ShipmentAddressDateGrouperFunction.Arn

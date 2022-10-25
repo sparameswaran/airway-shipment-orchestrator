@@ -167,8 +167,8 @@ Whenever making changes to the code or SAM templates, rerun the sam build follow
 * Once this is verified, go to the `AggregationKickoffStateMachine2` Step Function and start a new execution. This would check the ShipmentRecordQueue for zero available messages indicating all have been ingested to start the actual aggregation.
 * Wait for the AggregationKickoff to complete.
 * Check the `UPSShipmentHandlerStateMachine5` execution stats to see the actual invocation of UPS or other carrier handling the shipping.
-* `UPSTracking` should contain records of ups tracker ids and related shipment record ids while the `ShipmentRecord` table should reflect the updated shipment records with related ups tracker ids.
-* For repeated runs as necessary, clean up the various tables once testing is done using the `DDBTableCleanupHandlerFunction` Lambda function. To speed up clean of very large `ShipmentRecord` and `UPSTracking` tables that can take time, it tries to directly delete and recreate the tables rather than deleting the records. It just deletes the rows only for smaller tables: `ShipmentHash` and `AirwaysShipmentDetail`.
+* The `ShipmentRecord` table should reflect the updated shipment records along with related UPS tracker ids.
+* For repeated runs as necessary, clean up the various tables once testing is done using the `DDBTableCleanupHandlerFunction` Lambda function. To speed up clean of large set of contents in `ShipmentRecord` table that can take time, it tries to directly delete and recreate the tables rather than deleting the records. It just deletes the rows only for smaller tables: `ShipmentHash` and `AirwaysShipmentDetail`.
 
 ## Monitoring
 

@@ -6,7 +6,6 @@ import uuid
 SHIPMENT_HASH_TABLE = os.getenv('SHIPMENT_HASH_TABLE')
 SHIPMENT_RECORD_TABLE = os.getenv('SHIPMENT_RECORD_TABLE')
 AIRWAYS_SHIPMENT_TABLE = os.getenv('AIRWAYS_SHIPMENT_TABLE')
-UPS_TRACKER_TABLE = os.getenv('UPS_TRACKER_TABLE')
 
 dynamodb = boto3.resource('dynamodb')
 
@@ -200,16 +199,11 @@ def deleteTableContentWithSortKey(tableName, partitionKey, projectionSortKey):
 def lambda_handler(event, context):
     """
     print('Deleting Table contents for Airways Shipping')
-
     deleteTableContent(AIRWAYS_SHIPMENT_TABLE, 'shipmentRecordID')
 
     # Faster to recreate ShipmentRecord Table
     recreateTable(SHIPMENT_RECORD_TABLE, 'addrDateHash', 'recordId')
     #deleteTableContentWithSortKey(SHIPMENT_RECORD_TABLE, 'addrDateHash', 'recordId')
-
-    # Faster to recreate UPSTracker Table
-    recreateTable(UPS_TRACKER_TABLE, 'upsTracker', None)
-    #deleteTableContent(UPS_TRACKER_TABLE, 'upsTracker')
 
     deleteTableContentWithSortKey(SHIPMENT_HASH_TABLE, 'addrHashCode', 'addrDateHash')
     """
@@ -219,7 +213,6 @@ def lambda_handler(event, context):
     # Faster to recreate Tables with on-demand capacity
     recreateTable(AIRWAYS_SHIPMENT_TABLE, 'shipmentRecordID', None)
     recreateTable(SHIPMENT_RECORD_TABLE, 'addrDateHash', 'recordId')
-    recreateTable(UPS_TRACKER_TABLE, 'upsTracker', None)
     recreateTable(SHIPMENT_HASH_TABLE, 'addrHashCode', 'addrDateHash')
 
 
