@@ -571,10 +571,7 @@ Resources:
         UPSTrackingTable: !Ref UPSTrackingDDB
         AirwaysShipmentTable: !Ref AirwaysShipmentDetailDDB
         BusinessRulesValidator: !GetAtt OrderValidatorFunction.Arn
-<<<<<<< HEAD
         ShipmentAddressDateGrouperFunction: !GetAtt ShipmentAddressDateGrouperFunction.Arn
-=======
->>>>>>> 23486f0de65963becdf35afcb0339f828bf907f6
         ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
         ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName  ] ]
         SAWBHandler: !GetAtt AirwayShipmentGeneratorFunction.Arn

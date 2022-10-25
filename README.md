@@ -102,7 +102,7 @@ Note: Docker not really required if there is no local dev/test using sam local o
 Switch to different version of Python if necessary by changing version information inside the sam template file (template.yaml)
 
 
-The `sam build` command will build the source of your application (this requires python v3.9). The `sam deploy --guided` command will package and deploy your application to AWS, with a series of prompts for various parameters. Users can just hit enter to accept the defaults and deploy the application.
+The `sam build` command will build the source of your application (this requires python v3.9). The `sam deploy --guided` command will package and deploy your application to AWS, with a series of prompts for various parameters. Users can just hit enter to accept the defaults or choose to override the parameters and deploy the application.
 
 * **Stack Name**: The name of the stack to deploy to CloudFormation. This should be unique to your account and region, and a good starting point would be something matching your project name.
 * **AWS Region**: The AWS region you want to deploy your app.
