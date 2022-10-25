@@ -39,53 +39,6 @@
               "UPSShipmentRequest.$": "$.UPSShipment.Payload.ShipmentRequest"
             },
             "ResultPath": "$.DerivedParams",
-            "Next": "Save UPSTracker"
-          },
-
-          "Save UPSTracker": {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::dynamodb:putItem",
-            "ResultPath": null,
-            "Parameters": {
-              "TableName": "${UPSTrackingTable}",
-              "Item": {
-                "addrHashCode": {
-                  "S.$": "$.Payload.AddressHash"
-                },
-                "addrDateHash": {
-                  "S.$": "$.Payload.AddressDateHash"
-                },
-                "airwayBillNumber": {
-                  "S.$": "$.Payload.AirwayBillNumber"
-                },
-                "shipmentRecordId": {
-                  "S.$": "$.DerivedParams.ShipmentRecordId"
-                },
-                "upsTracker": {
-                  "S.$": "$.DerivedParams.UPSTrackerID"
-                },
-                "upsShipmentResponse": {
-                  "S.$": "States.JsonToString($.DerivedParams.UPSShipmentResponse)"
-                },
-                "associatedShipmentDetail": {
-                  "S.$": "States.JsonToString($.DerivedParams.UPSShipmentRequest)"
-                },
-                "processTime": {
-                  "S.$": "$$.State.EnteredTime"
-                }
-              }
-            },
-            "Retry": [
-              {
-                "ErrorEquals": [
-                  "States.TaskFailed"
-                ],
-                "BackoffRate": 2,
-                "IntervalSeconds": 2,
-                "MaxAttempts": 15,
-                "Comment": "Retry DDB inserts/updates"
-              }
-            ],
             "Next": "Update Shipment Record with UPS Tracker"
           },
           "Update Shipment Record with UPS Tracker": {
@@ -102,13 +55,22 @@
                   "S.$": "$.DerivedParams.ShipmentRecordId"
                 }
               },
-              "UpdateExpression": "SET upsTracker = :myValueRef, airwayBillNumber = :airwayBillNumber",
+              "UpdateExpression": "SET upsTracker = :myValueRef, airwayBillNumber = :airwayBillNumber, upsShipmentResponse = :upsShipmentResponse, shipmentProcessTime = :shipmentProcessTime, addrHashCode = :addrHashCode ",
               "ExpressionAttributeValues": {
+                ":airwayBillNumber": {
+                  "S.$": "$.Payload.AirwayBillNumber"
+                },
                 ":myValueRef": {
                   "S.$": "$.DerivedParams.UPSTrackerID"
                 },
-                ":airwayBillNumber": {
-                  "S.$": "$.Payload.AirwayBillNumber"
+                ":upsShipmentResponse": {
+                  "S.$": "States.JsonToString($.DerivedParams.UPSShipmentResponse)"
+                },
+                ":shipmentProcessTime": {
+                  "S.$": "$$.State.EnteredTime"
+                },
+                ":addrHashCode": {
+                  "S.$": "$.Payload.AddressHash"
                 }
               }
             },

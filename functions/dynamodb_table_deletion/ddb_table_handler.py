@@ -3,9 +3,6 @@ import boto3
 import os
 import uuid
 
-from boto3.dynamodb.conditions import Key
-from boto3.dynamodb.conditions import Attr
-
 SHIPMENT_HASH_TABLE = os.getenv('SHIPMENT_HASH_TABLE')
 SHIPMENT_RECORD_TABLE = os.getenv('SHIPMENT_RECORD_TABLE')
 AIRWAYS_SHIPMENT_TABLE = os.getenv('AIRWAYS_SHIPMENT_TABLE')
