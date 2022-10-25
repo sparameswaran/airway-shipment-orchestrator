@@ -140,7 +140,7 @@ There are 2 parts to the workflow:
 Steps:
 
 * Go to the testing folder.
-* Edit the target and load testing configurations in config.json file
+* Edit the target and load testing configurations in config.json file for API Gateway REST endpoint and load parameters
 ```
 "config": {
   "target": "https://<EDIT_ME_WITH_API_GATEWAY_ENDPOINT>.amazonaws.com",
@@ -149,7 +149,7 @@ Steps:
   ],
   ....
 ```
-  Edit the target to the API endpoint created at end of the SAM template deployment (without /dev or other stage name)
+  Edit the target to the API endpoint created at end of the SAM deployment (without any trailing `/` or stage names)
   Edit the `arrivalRate` to be small for initial testing (controls how many requests to submit in a given second)
   The duration parameter indicates how long to run the test which can be bumped up. Total number of submitted requests would be equal to (arrival rate * duration).
   The shipment payload would be dynamically substituted with addresses specified in the sample 200-addresses.csv file.
@@ -172,7 +172,7 @@ Whenever making changes to the code or SAM templates, rerun the sam build follow
 
 ## Monitoring
 
-Use CloudWatch Dashboard to monitor the various metrics emitted from API Gateway, SQS, Lambda, DynamoDB, Step Functions. Create a new dashboard in CloudWatch and just add a sample widget for any metric. Then use the provided sample dashboard template: `testing/dashboard.json` template, edit the <AWS_REGION> and <AWS_ACCOUNT_ID> with valid actual values and then replace the newly created dashboard with this customized one using the `Actions` -> `View/edit source` option in Dashboard.
+Use CloudWatch Dashboard to monitor the various metrics emitted from API Gateway, SQS, Lambda, DynamoDB, Step Functions. Create a new dashboard in CloudWatch. Create a copy of the sample dashboard template from `testing/dashboard.json` and edit the `<AWS_REGION>` and `<AWS_ACCOUNT_ID>` with valid actual region and AWS account values and then import it into the newly created dashboard using the `Actions` -> `View/edit source` option in Dashboard. Overwrite the empty widget/content with the newly edited template contents and save it to apply the changes.
 ![](imgs/Dashboard.png)
 
 ## Cleanup
