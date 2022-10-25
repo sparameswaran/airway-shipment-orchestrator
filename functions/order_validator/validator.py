@@ -60,12 +60,12 @@ def lambda_handler(event, context):
             errors.append( { 'code': 'max_length_exceeded', 'message': 'Test Error!! Value length must not exceed 2 for element N4-02', 'field': 'state_or_province_code_02' } )
             hasErrors = True
             ediRecord['errors'] = errors
-            
+
         ediRecord['addrHash'] = addrHashMap
         ediRecord['recordId'] = record['messageId']
 
         inputPayload = { 'input': ediRecord }
-    
+
         response = client.start_execution(
             stateMachineArn=stateMachineArn,
             input= json.dumps(inputPayload)
@@ -121,7 +121,6 @@ def calculateHash(ediRecord):
                 addrSection = name_N1_loop_entry['geographic_location_N4']
                 buf = io.StringIO()
                 buf.write('%s:%s:%s:%s' % (addrString,
-
                                             addrSection.get('city_name_01'),
                                             addrSection.get('postal_code_03'),
                                             addrSection.get('country_code_04') ) )
@@ -135,6 +134,8 @@ def calculateHash(ediRecord):
 
     addrEncoded = addrString.encode()
     hashcode = hashlib.md5(addrEncoded).hexdigest()
-    addrDateHash = hashcode + '#' + str(date.today()) + '#' + str(random.randrange(MAX_PARTITION_RANGE))
-        
+    # Create hash with day and hour and minute so it shows up as brand new row in ShipmentHash and ShipmentRecord
+    # Rather than overwriting existing records
+    addrDateHash = hashcode + '#' + time.strftime("%Y-%m-%d-%H-%M") + '#' + str(random.randrange(MAX_PARTITION_RANGE))
+
     return { 'addrHashCode': hashcode, 'addrCombo' : addrString, 'addrDateHash': addrDateHash }

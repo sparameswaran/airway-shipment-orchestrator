@@ -29,14 +29,18 @@ def recreateTable(tableName, partitionKey, sortKey):
     keySchema = [ {'AttributeName': partitionKey, 'KeyType': 'HASH'} ]
     attributeDefinitions = [ {'AttributeName': partitionKey, 'AttributeType': 'S'} ]
 
-    provisionedThroughput = {
-                                'ReadCapacityUnits': 100,
-                                'WriteCapacityUnits': 200
-                            }
 
     if sortKey is not None:
         keySchema.append({'AttributeName': sortKey, 'KeyType': 'RANGE'})
         attributeDefinitions.append({'AttributeName': sortKey, 'AttributeType': 'S'})
+
+    # Not using provisioned throughput
+    """"
+    provisionedThroughput = {
+                                'ReadCapacityUnits': 100,
+                                'WriteCapacityUnits': 200
+                            }
+    """
 
     table = dynamodb.create_table(TableName=tableName,
                                     KeySchema=keySchema,
@@ -46,8 +50,6 @@ def recreateTable(tableName, partitionKey, sortKey):
 
     print('Creating Table {}...', format(tableName))
     table.wait_until_exists()
-
-
 
 
 def deleteTableContent(tableName, partitionKey):
@@ -118,7 +120,7 @@ def deleteTableContent(tableName, partitionKey):
     print('Finally deleted {} entries from {}\n'.format(str(totalRows), tableName))
 
 def deleteTableContentWithSortKey(tableName, partitionKey, projectionSortKey):
-    print('Starting deletion of contents from Table: ', tableName)
+    print('Starting deletion of contents from Table: {} with hash key: {} and sort key: {}'.format(tableName, partitionKey, projectionSortKey))
 
     recordTable = dynamodb.Table(tableName)
     partitionKeyResponse = recordTable.scan( ProjectionExpression=partitionKey)
@@ -199,6 +201,7 @@ def deleteTableContentWithSortKey(tableName, partitionKey, projectionSortKey):
 
 
 def lambda_handler(event, context):
+    """
     print('Deleting Table contents for Airways Shipping')
 
     deleteTableContent(AIRWAYS_SHIPMENT_TABLE, 'shipmentRecordID')
@@ -212,6 +215,16 @@ def lambda_handler(event, context):
     #deleteTableContent(UPS_TRACKER_TABLE, 'upsTracker')
 
     deleteTableContentWithSortKey(SHIPMENT_HASH_TABLE, 'addrHashCode', 'addrDateHash')
+    """
+
+    print('Deleting all tables and recreating them!!')
+
+    # Faster to recreate Tables with on-demand capacity
+    recreateTable(AIRWAYS_SHIPMENT_TABLE, 'shipmentRecordID', None)
+    recreateTable(SHIPMENT_RECORD_TABLE, 'addrDateHash', 'recordId')
+    recreateTable(UPS_TRACKER_TABLE, 'upsTracker', None)
+    recreateTable(SHIPMENT_HASH_TABLE, 'addrHashCode', 'addrDateHash')
+
 
 
 """

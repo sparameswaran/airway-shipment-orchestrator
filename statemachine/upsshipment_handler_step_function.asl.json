@@ -102,10 +102,13 @@
                   "S.$": "$.DerivedParams.ShipmentRecordId"
                 }
               },
-              "UpdateExpression": "SET upsTracker = :myValueRef",
+              "UpdateExpression": "SET upsTracker = :myValueRef, airwayBillNumber = :airwayBillNumber",
               "ExpressionAttributeValues": {
                 ":myValueRef": {
                   "S.$": "$.DerivedParams.UPSTrackerID"
+                },
+                ":airwayBillNumber": {
+                  "S.$": "$.Payload.AirwayBillNumber"
                 }
               }
             },

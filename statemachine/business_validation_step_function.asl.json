@@ -25,6 +25,9 @@
           "addrDateHash": {
             "S.$": "$.input.addrHash.addrDateHash"
           },
+          "addrCombo": {
+            "S.$": "$.input.addrHash.addrCombo"
+          },
           "wasProcessed": {
             "BOOL": "false"
           }
@@ -42,7 +45,7 @@
           "MaxAttempts": 6,
           "Comment": "Retry DDB inserts/updates"
         }
-      ]            
+      ]
     },
     "Save Shipment Record": {
       "Type": "Task",
@@ -74,7 +77,7 @@
           "MaxAttempts": 6,
           "Comment": "Retry DDB inserts/updates"
         }
-      ],            
+      ],
       "End": true
     },
     "Choice": {

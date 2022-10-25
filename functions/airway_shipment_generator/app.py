@@ -2,6 +2,7 @@ import json
 import boto3
 import os
 import uuid
+import time
 from datetime import date
 from datetime import datetime
 
@@ -63,7 +64,7 @@ def lambda_handler(event, context):
 
 
     #airwaybillJson['shipment_entries'] = hashIdsResponse['Items']
-    airwaybillJson['addrDateHash'] = hashKey + '#' + str(date.today())
+    airwaybillJson['addrDateHash'] = hashKey + '-' + time.strftime("%Y-%m-%d-%H-%M")
     airwaybillJson['processDate'] = str(date.today())
     airwaybillJson['processTime'] = str(datetime.now())
     airwaybillJson['sawb_bill_number'] = str(uuid.uuid4())

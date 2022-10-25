@@ -11,10 +11,12 @@ The project contains source code and supporting files that you can deploy with t
 * testing - folder that contains artillery test configuration script for injecting requests into the system.
 
 ## Architecture
+A large batch of shipment requests need to be handled via automation with support for validation of business rules around shipment payload/address information, followed by aggregation based on shipment destination address and generation of associated airway shipment bill, finally followed by UPS shipping submissions per individual shipment. The source of ingestion would be a AWS SQS Queue and the workflow would be implemented using Step Functions and mix of other services/resources. The carrier workflow portion can be switched between various providers as well as used to kick off other processes using SNS -> publish to SQS/Email/SMS/EventBridge.
 
-A large batch of shipment requests need to be handled via automation with support for validation of business rules around shipment payload/address information, followed by aggregation based on shipment destination address and generation of associated airway shipment bill, finally followed by UPS shipping submissions per individual shipment. The source of ingestion would be a AWS SQS Queue and the workflow would be implemented using Step Functions and mix of other services/resources.
+High level architecture:
+![](imgs/AirwaysShipmentWorkflow-HighlevelArch.png)
 
-High level architecture is shown below:
+Detailed architecture:
 ![](imgs/AirwaysShipmentWorkflow.png)
 
 ### Step Functions:
@@ -161,7 +163,7 @@ Steps:
 * Start the tests from the `testing folder` using `./runArtillery.sh` script or just run `artillery run config.json`
 Whenever making changes to the code or SAM templates, rerun the sam build followed by sam deploy.
 
-*2)* To kick off the aggeregation and processing of the shipments, wait for the shipment records to show up in the ShipmentRecord DDB table. There can a few failed records that goes to the ShipmentRecordDLQueue with rest being successfully inserted into ShipmentRecord table. The total ingestion process should be over in one-two minutes once artillery has completed its run. 
+*2)* To kick off the aggeregation and processing of the shipments, wait for the shipment records to show up in the ShipmentRecord DDB table. There can a few failed records that goes to the ShipmentRecordDLQueue with rest being successfully inserted into ShipmentRecord table. The total ingestion process should be over in one-two minutes once artillery has completed its run.
 * Once this is verified, go to the `AggregationKickoffStateMachine2` Step Function and start a new execution. This would check the ShipmentRecordQueue for zero available messages indicating all have been ingested to start the actual aggregation.
 * Wait for the AggregationKickoff to complete.
 * Check the `UPSShipmentHandlerStateMachine5` execution stats to see the actual invocation of UPS or other carrier handling the shipping.
