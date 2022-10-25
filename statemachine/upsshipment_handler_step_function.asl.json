@@ -85,6 +85,20 @@
                 "Comment": "Retry DDB inserts/updates"
               }
             ],
+            "Next": "Save Results of Shipping"
+          },
+          "Save Results of Shipping": {
+            "Type": "Pass",
+            "Parameters": {
+              "AddressHash.$": "$.Payload.AddressHash",
+              "AddressDateHash.$": "$.Payload.AddressDateHash",
+              "AirwayBillNumber.$": "$.Payload.AirwayBillNumber",
+              "ShipmentRecordId.$": "$.DerivedParams.ShipmentRecordId",
+              "UPSTrackerID.$": "$.DerivedParams.UPSTrackerID",
+              "ShipmentProcessTime.$": "$$.State.EnteredTime"
+            },
+            "ResultPath": "$.myResultParameters",
+            "OutputPath": "$.myResultParameters",
             "End": true
           }
         }
