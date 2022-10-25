@@ -46,7 +46,6 @@ All the below tables are configured with on-demand capacity to handle large thro
 
 * `AirwaysShipmentDetail` contains the airway shipment bill generated per unique address against the aggregated shipments for a given batch submission.
 
-* `UPSTracking` contains the UPS Tracker id and associated shipping request/response and the related shipment record id.
 ![](imgs/DynamoDB-Structure.png)
 
 ### Key API Gateway and Lambda Functions
@@ -77,8 +76,8 @@ Detailed architecture:
   * For each unique address hash + partition discovered, a child step function `SAWBProcessorStateMachine3` is invoked to handle the actual airway shipment bill generation and for each entry going to the same address, UPS shipping service needs to be invoked with the relevant payload.
   * `SAWBProcessorStateMachine3` handles generation of the Airway Shipment Bill using Lambda function `AirwayShipmentGeneratorFunction` (the shipment bill gets saved in `AirwaysShipmentDetail` table in DynamoDB) and then checks if inventory is available for that shipment for default supplier and switches the supplier as necessary before passing to another Map step that iterates over the individual shipment entries that are being sent via UPS to the same address.
   * For each shipment, a message is published to the `ShipmentCarrierTopic` Topic that allows the actual carrier to handle the shipping. The Topic publishes to `ShipmentCarrierQueue` which gets picked by a ShipmentCarrier Lambda that in turn triggers UPS Carrier Shipping related workflow service.
-  * `UPSShipmentHandlerStateMachine5` gets invoked to handle the Airways shipment bill and record, calls the UPS service and the results get saved in `UPSTracking` table.
-  * All the Shipment records with associated UPS or other carrier shipment labels are saved in DynamoDB `ShipmentRecord` table. There is a separate `UPSTracking` table that has the individual tracker id along with related shipping record id. Heavy writes and reads in DynamoDB can result in throttling as DynamoDB atempts to scale the table (when using on-demand capacity). Code attempts to retry with increasing backoff rates.
+  * `UPSShipmentHandlerStateMachine5` gets invoked to handle the Airways shipment bill and record, calls the UPS service and the results get updated in `ShipmentRecord` table.
+  * All the Shipment records with associated UPS or other carrier shipment labels are saved in DynamoDB `ShipmentRecord` table. Heavy writes and reads in DynamoDB can result in throttling as DynamoDB atempts to scale the table (when using on-demand capacity). Code attempts to retry with increasing backoff rates.
 * Any repeat submissions to the Aggregation Step Function for an already processed address will return with no operations.
 
 ## Requirements
@@ -112,7 +111,6 @@ The `sam build` command will build the source of your application (this requires
 * **ShipmentHashTableName**: DynamoDB table persisting the unique address hashes; default value: `ShipmentHash`
 * **ShipmentRecordTableName**: DynamoDB table persisting the individual shipment records; default value: `ShipmentRecord`
 * **AirwaysShipmentDetailTableName**: name of the DynamoDB Table to store the airways shipment detail for each unique shipment address; default value: `AirwaysShipmentDetail`
-* **UPSShipmentTrackingTableName**: name of the DynamoDB Table to store the UPS shipping record for each shipment; default value: `UPSTracking`
 * **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
 * **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
 * **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
@@ -177,7 +175,7 @@ Use CloudWatch Dashboard to monitor the various metrics emitted from API Gateway
 
 ## Cleanup
 
-For repeated runs as necessary, clean up the various tables once testing is completed using the `DDBTableCleanupHandlerFunction` Lambda function. To speed the cleanup of very large `ShipmentRecord` and `UPSTracking` tables that can take time, the Lambda function directly deletes and recreate the tables rather than deleting the records in loop. The overall clean up can take longer upwards of 6-8 minutes depending on content.
+For repeated runs as necessary, clean up the various tables once testing is completed using the `DDBTableCleanupHandlerFunction` Lambda function. To speed the cleanup of a very large `ShipmentRecord`table that can take time, the Lambda function directly deletes and recreate the tables rather than deleting the records in loop. The overall clean up can take longer upwards of 6-8 minutes depending on content.
 
 To delete the entire application along with resources created, use the AWS CLI. First delete the S3 bucket hosting the batch script. Assuming you used your project name for the stack name, you can run the following:
 

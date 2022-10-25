@@ -107,10 +107,9 @@
             "type": "metric",
             "properties": {
                 "metrics": [
-                    [ "AWS/DynamoDB", "ReturnedItemCount", "TableName", "UPSTracking", "Operation", "Scan" ],
+                    [ "AWS/DynamoDB", "ReturnedItemCount", "TableName", "ShipmentHash", "Operation", "Scan" ],
                     [ "...", "AirwaysShipmentDetail", ".", "Query" ],
-                    [ "...", "ShipmentRecord", ".", "." ],
-                    [ "...", "ShipmentHash", ".", "Scan" ]
+                    [ "...", "ShipmentRecord", ".", "." ]
                 ],
                 "view": "timeSeries",
                 "stacked": false,
