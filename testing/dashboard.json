@@ -15,7 +15,7 @@
                 "region": "<AWS_REGION>",
                 "period": 30,
                 "stat": "Sum",
-                "title": "API Gateway Invocations"
+                "title": "Shipment Ingestion via REST APIs"
             }
         },
         {
@@ -38,7 +38,7 @@
                 "view": "timeSeries",
                 "stacked": false,
                 "region": "<AWS_REGION>",
-                "title": "SQS Stats",
+                "title": "Queue Stats (for ingestion and UPS)",
                 "period": 10,
                 "stat": "Sum"
             }
@@ -89,13 +89,12 @@
                     [ ".", "ExecutionsStarted", ".", "." ],
                     [ ".", "ExecutionsAborted", ".", "." ],
                     [ ".", "ExecutionsSucceeded", ".", "." ]
-
                 ],
                 "view": "timeSeries",
                 "stacked": false,
                 "region": "<AWS_REGION>",
                 "period": 30,
-                "title": "State Machine Execution Stats",
+                "title": "Workflow (State Machine) Execution Stats",
                 "stat": "Sum"
             }
         },
@@ -115,7 +114,8 @@
                 "stacked": false,
                 "region": "<AWS_REGION>",
                 "period": 30,
-                "stat": "Sum"
+                "stat": "Sum",
+                "title": "DynamoDB Operations"
             }
         }
     ]

@@ -20,6 +20,10 @@ Parameters:
     Type: String
     Description: Name of the AWS SNS Topic to handle carrier shipments
     Default: ShipmentCarrierTopic
+  TriggerShipmentAggregationTopicName:
+    Type: String
+    Description: Name of the AWS SNS Topic to trigger Shipment Aggregation/Orchestration
+    Default: ShipmentAggregationTriggerTopic
   ShipmentCarrierQueueName:
     Type: String
     Description: Name of the AWS SQS Queue to handle specific carrier shipments
@@ -60,16 +64,12 @@ Resources:
       QueueName: !Ref ShipmentRecordManualResubmitQueueName
       VisibilityTimeout: 300
 
-  ShipmentCarrierTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      DisplayName: String
-      TopicName: !Ref ShipmentCarrierTopicName
   ShipmentCarrierSubscriberQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Ref ShipmentCarrierQueueName
       VisibilityTimeout: 300
+
   ShipmentCarrierSnsSubscription:
     Type: AWS::SNS::Subscription
     Properties:
@@ -77,6 +77,13 @@ Resources:
       Endpoint: !GetAtt ShipmentCarrierSubscriberQueue.Arn
       TopicArn: !Ref ShipmentCarrierTopic
       RawMessageDelivery: false
+
+  ShipmentCarrierTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: String
+      TopicName: !Ref ShipmentCarrierTopicName
+
   ShipmentCarrierQueuePublishPolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
@@ -96,6 +103,58 @@ Resources:
             ArnEquals:
               aws:SourceArn: !Join [ ":", [ !Sub "arn:aws:sns:${AWS::Region}", !Ref AWS::AccountId, !Ref ShipmentCarrierTopicName ] ]
 
+  TriggerShipmentAggregationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: String
+      TopicName: !Ref TriggerShipmentAggregationTopicName
+
+  TriggerShipmentAggregationTopicPublishPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref TriggerShipmentAggregationTopic
+      PolicyDocument:
+        Version: 2012-10-17
+        Id: SNSPolicy
+        Statement:
+        - Effect: Allow
+          Sid: Allow-CW-PublishToTopic
+          Principal:
+            Service: "cloudwatch.amazonaws.com"
+          Action: "sns:Publish"
+          Resource: !Ref TriggerShipmentAggregationTopic
+          Condition:
+            ArnEquals:
+              aws:SourceArn: !Join [ ":", [ !Sub "arn:aws:cloudwatch:${AWS::Region}", !Ref AWS::AccountId, 'alarm', !Ref ShipmentRecordsIngestionAlarm ] ]
+
+  TriggerShipmentAggregationTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: lambda
+      Endpoint: !GetAtt TriggerShipmentAggregationKickOffFunction.Arn
+      TopicArn: !Ref TriggerShipmentAggregationTopic
+
+  ShipmentRecordsIngestionAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: ShipmentRecordsIngestionAlarm
+      ActionsEnabled: true
+      AlarmActions:
+          - !Ref TriggerShipmentAggregationTopic
+      InsufficientDataActions: []
+      MetricName: NumberOfMessagesReceived
+      Namespace: AWS/SQS
+      Statistic: Sum
+      Dimensions:
+          - Name: QueueName
+            Value: !Ref ShipmentRecordQueueName
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 300
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: missing
 
   ShipmentHashDDB:
     Type: AWS::DynamoDB::Table
@@ -377,6 +436,7 @@ Resources:
                   !Ref ShipmentCarrierTopic
                 ]
 
+
   DDBTableHandlerFunction:
     Type: AWS::Serverless::Function
     DependsOn: [ LambdaExecutionRole ]
@@ -582,6 +642,27 @@ Resources:
         ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
         ShipmentManualResubmitQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordManualResubmitQueueName  ] ]
         ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName  ] ]
+
+  TriggerShipmentAggregationKickOffFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: [ LambdaExecutionRole ]
+    Properties:
+      FunctionName: TriggerShipmentAggregationKickOffFunction
+      CodeUri: functions/aggregation_kickoff/
+      Handler: aggregation_kickoff_trigger.lambda_handler
+      Runtime: python3.9
+      Timeout: 30
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          ORCHESTRATION_KICKOFF_STEPFUNCTION: !GetAtt AggregationKickoffStateMachine2.Arn
+
+  ShipmentAggregationKickOffFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      FunctionName: !Ref  TriggerShipmentAggregationKickOffFunction
 
   AirwaysShipmentApi:
     Type: AWS::Serverless::Api
