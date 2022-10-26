@@ -3,7 +3,7 @@
 This sample project demonstrates airway shipment orchestration using AWS Serverless components including [API Gateway](https://aws.amazon.com/api-gateway/), [Step Functions](https://aws.amazon.com/step-functions/), [Lambda](https://aws.amazon.com/lambda/) along with [SQS](https://aws.amazon.com/sqs/) and [DynamoDB](https://aws.amazon.com/dynamodb/)) to implement complex workflows that integrates automated systems with various decision branches. The use case demonstrates ingestion of multiple shipment requests, validation using business rules, creation of an airway shipment bill per unique destination, aggregating the shipments and invoking UPS for shipping of individual shipment items.
 
 ##  Project structure
-The project contains source code and supporting files that you can deploy with the SAM CLI to build the sample application. It includes the following files and folders:
+The project contains source code and supporting files that you can deploy with the SAM CLI to build and test the sample application. It includes the following files and folders:
 * functions - AWS Lambda functions to handle processing of shipments requests from SQS and integration with various backend systems (including UPS shipping api).
 * statemachines - Definition for the AWS Step Functions that orchestrates the complex workflow of managing multiple Lambda and nested AWS child Step Functions.
 * template.yaml - A SAM template that defines the application's AWS resources.
@@ -19,7 +19,9 @@ High level architecture:
 * `BusinessValidationStateMachine1` initially checks for validation errors and decides on normal processing, or manual resubmission or error processing based on validation errors. It creates an address hash based on shipment address along with a date + random partition hash (as there can be large number of shipments to same destination). It saves the individual records, hashes and shipment address in DynamoDB. Failed validations are passed onto Dead Letter Queue or different queues based on type of validation errors.
 ![](imgs/BusinessValidationStateMachine1.png)
 
-* `AggregationKickoffStateMachine2` aggregate the orders based on destination address for further processing once the batch of shipments have been all validated. This has to be kicked off manually once we know the batch of shipment records has been validated and saved. For each unique shipment address in the batch, an instance of `SAWBProcessorStateMachine3` would be created using Step Funtion's Map construct. The AggregationKickoff Step Function invocation has to be done just once per submitted batch with no real inputs required for the AggregationKickoff state machine.
+* `AggregationKickoffStateMachine2` aggregates the orders based on destination address for processing once the batch of shipments have been validated. This can be kicked off manually once we know the batch of shipment records has been validated and saved. For each unique shipment address in the batch, an instance of `SAWBProcessorStateMachine3` would be created using Step Funtion's Map construct. The AggregationKickoff Step Function invocation has to be done just once per submitted batch with no real inputs required for the AggregationKickoff state machine.
+
+Option to automatically trigger the StepFunction based on number of shipments received in the `ShipmentRecordQueue` is also suported. Once the messages received in a minute grows beyond 300 (monitored using CloudWatch SQS related Metrics), it goes into alarm state and an alarm event gets published to a SNS topic that in turn invokes a Lambda function to trigger the Step Function execution. Edit the SAM template to tweak the alarm thresholds. For low volume testing, the 300 shipments might not be reached and in those cases, a manual trigger of the StepFunction execution would be required.
 <img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/AggregationKickoffStateMachine2.png" width=25% height=25%>
 
 * `SAWBProcessorStateMachine3` handles Airway shipment generation per unique destination address. Then it starts handling the shipments using a Map construct in Step Functions to handle the individual line items associated with an unique shipment address and assigned date + random partition. It takes an input argument of an existing hash of destination addresses partitions.
@@ -63,6 +65,13 @@ All the below tables are configured with on-demand capacity to handle large thro
 ### Detailed Workflow
 Detailed architecture:
 ![](imgs/AirwaysShipmentWorkflow.png)
+
+The design allows Divide and Conquer using Child Step Functions to handle each distinct shipment address and further dividing the shipments using sub-partition based on date and some random numbers to ensure a single Step Function does not hit its [25K max execution event history](https://docs.aws.amazon.com/step-functions/latest/dg/bp-history-limit.html) while also increasing the parallelism using [Map](https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-map-state.html) constructs to fire off additional child step functions. The design was tested against 20K shipment requests with majority going to a specific destination address.
+
+The DynamoDB tables are created with on-demand capacity rather than provisioned to allows scaling on demand with higher loads. Additional reason for sub-partitioning is to avoid Hot Partition Key problem with DynamoDB when majority of the shipments go to the same destination address compared to rest.
+
+The main aggregation workflow is decoupled from the final carrier invocations using SNS Topic + SQS Queue. This design allows plugging in different carrier implementations with message filtering/selection and implementing routing to appropriate carrier, and enabling buffering and throttling when dealing with carriers without affecting main aggregation workflow.
+![](imgs/StepFunctionMapStructure.png)
 
 * Airways Shipment system accepts individual shipment requests via an API endpoint (deployed via SAM template) that gets saved as individual messages in `ShipmentRecordQueue` SQS Queue.
 * `OrderValidatorFunction` Lambda function subscribed to the `ShipmentRecordQueue` SQS Queue consumes the batch of messages and starts validating the entries and marks errors as required.
