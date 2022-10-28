@@ -2,13 +2,13 @@
   "Comment": "Handle Shipments by Partitions",
   "StartAt": "Start query for unprocessed shipment records",
   "States": {
-    
+
 "Start query for unprocessed shipment records": {
       "Type": "Task",
       "Next": "Map",
       "Parameters": {
         "TableName": "${ShipmentRecordTable}",
-        "ProjectionExpression": "processTime,recordId,addrDateHash",
+        "ProjectionExpression": "processTime,recordId,addrDateHash,body",
         "ExpressionAttributeValues": {
           ":addrDateHash": {
             "S.$": "$.AddressDateHash"
@@ -31,10 +31,12 @@
               "Parameters": {
                 "TopicArn": "${ShipmentCarrierSNSTopic}",
                 "Message": {
-                  "Shipment.$": "$.Shipment",
+                  "ShipmentRecordId.$": "$.Shipment.recordId.S",
+                  "ShipmentRequest.$": "$.Shipment.body.S",
                   "AddressHash.$": "$.AddressHash",
                   "AddressDateHash.$": "$.AddressDateHash",
-                  "AirwayBillNumber.$": "$.AirwayBillNumber"
+                  "AirwayBillNumber.$": "$.AirwayBillNumber",
+                  "ShipmentProcessSubmissionTime.$": "$$.State.EnteredTime"
                 },
                 "MessageAttributes": {
                  "Carrier": {
@@ -43,8 +45,22 @@
                  }
                 }
               },
-              "End": true
-            }
+              "ResultPath": null,
+              "Next": "Save Processed ShipmentRequests"
+            },
+            "Save Processed ShipmentRequests": {
+            "Type": "Pass",
+            "Parameters": {
+              "ShipmentRecordId.$": "$.Shipment.recordId.S",
+              "AddressHash.$": "$.AddressHash",
+              "AddressDateHash.$": "$.AddressDateHash",
+              "AirwayBillNumber.$": "$.AirwayBillNumber",
+              "ShipmentProcessSubmissionTime.$": "$$.State.EnteredTime"
+            },
+            "ResultPath": "$.ProcessedRecords",
+            "OutputPath": "$.ProcessedRecords",
+            "End": true
+          }
         }
       },
       "ItemsPath": "$.UnTrackedShipmentRecords.Items",
@@ -95,27 +111,11 @@
         "ProcessedRecordsLen.$": "States.ArrayLength($.ProcessedRecords)"
       },
       "ResultPath": "$.ProcessedRecordsLen",
-      "Next": "Check for Outputs in ProcessedRecords"
-    },
-    "Check for Outputs in ProcessedRecords": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.ProcessedRecordsLen.ProcessedRecordsLen",
-          "NumericEquals": 0,
-          "Next": "Pass Outer ProcessedRecords"
-        }
-      ],
-      "Default": "Save Results of ShipmentPartitions"
-    },
-    "Pass Outer ProcessedRecords": {
-      "Type": "Pass",
-      "OutputPath": "$.ProcessedRecords",
-      "End": true
+      "Next": "Save Results of ShipmentPartitions"
     },
     "Save Results of ShipmentPartitions": {
       "Type": "Pass",
-      "OutputPath": "$.ProcessedRecords[*].Output",
+      "OutputPath": "$.ProcessedRecords",
       "End": true
     }
   }

@@ -149,35 +149,48 @@
     },
     "Get ShipmentGroups By Sub-partitions": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "${ShipmentAddressDateGrouperFunction}",
-        "Payload.$": "$"
+        "TableName": "${ShipmentHashTable}",
+        "ProjectionExpression": "addrDateHash",
+        "ExpressionAttributeValues": {
+          ":givenAddrHashCode": {
+            "S.$": "$.addrHashCode"
+          }
+        },
+        "KeyConditionExpression": "addrHashCode = :givenAddrHashCode",
+        "FilterExpression": "attribute_not_exists(sawbHash)"
       },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "ResultPath": "$.RemainingAddressDateMap",
       "Retry": [
         {
           "ErrorEquals": [
-            "Lambda.ServiceException",
-            "Lambda.AWSLambdaException",
-            "Lambda.SdkClientException"
+            "States.TaskFailed"
           ],
-          "IntervalSeconds": 1,
-          "MaxAttempts": 6,
-          "BackoffRate": 2
+          "BackoffRate": 2,
+          "IntervalSeconds": 2,
+          "MaxAttempts": 15,
+          "Comment": "Retry DDB inserts/updates"
         }
       ],
-      "Next": "Map based on Address partitions",
-      "ResultSelector": {
-        "AddrDateMap.$": "$.Payload"
-      },
-      "ResultPath": "$.AddressDateMap"
+      "Next": "Map based on Address partitions"
     },
     "Map based on Address partitions": {
       "Type": "Map",
-      "Next": "Get Length of ProcessedRecords",
+      "Next": "Check for additional Address Date map entries",
       "Iterator": {
-        "StartAt": "Handle Shipment by Address Partitions",
+        "StartAt": "Reset AddressDateHash",
+
         "States": {
+
+            "Reset AddressDateHash": {
+            "Type": "Pass",
+            "Parameters": {
+              "AddressDateHash.$": "$.AddressDateHashOuter.addrDateHash.S"
+            },
+            "ResultPath": "$.AddressDateOuter",
+            "Next": "Handle Shipment by Address Partitions"
+          },
 
           "Handle Shipment by Address Partitions": {
             "Type": "Task",
@@ -186,7 +199,7 @@
               "StateMachineArn": "${ShipmentPartitionHandlerStepFunction}",
               "Input": {
                 "AddressHash.$": "$.AddressHash",
-                "AddressDateHash.$": "$.AddressDateHash",
+                "AddressDateHash.$": "$.AddressDateOuter.AddressDateHash",
                 "AirwayBillNumber.$": "$.AirwayBillNumber",
                 "AWS_STEP_FUNCTIONS_STARTED_BY_EXECUTION_ID.$": "$$.Execution.Id"
               }
@@ -206,7 +219,7 @@
                   "S.$": "$.AddressHash"
                 },
                 "addrDateHash": {
-                  "S.$": "$.AddressDateHash"
+                  "S.$": "$.AddressDateOuter.AddressDateHash"
                 }
               },
               "UpdateExpression": "SET wasProcessed = :myValueRef, sawbHash = :sawbHashRef",
@@ -234,13 +247,43 @@
           }
         }
       },
-      "ItemsPath": "$.AddressDateMap.AddrDateMap",
+      "ItemsPath": "$.RemainingAddressDateMap.Items",
       "Parameters": {
-        "AddressDateHash.$": "$$.Map.Item.Value",
+        "AddressDateHashOuter.$": "$$.Map.Item.Value",
         "AddressHash.$": "$.addrHashCode",
         "AirwayBillNumber.$": "$.AirwayBill.AirwayBillResponse.sawb_bill_number"
       },
       "ResultPath": "$.ProcessedRecords"
+    },
+    "Check for additional Address Date map entries": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Not": {
+            "Variable": "$.RemainingAddressDateMap.LastEvaluatedKey",
+            "IsPresent": true
+          },
+          "Next": "Get Length of ProcessedRecords"
+        }
+      ],
+      "Default": "Continue query for additional Address Date map entries"
+    },
+    "Continue query for additional Address Date map entries": {
+      "Type": "Task",
+      "Next": "Map based on Address partitions",
+      "Parameters": {
+        "TableName": "${ShipmentHashTable}",
+        "ProjectionExpression": "addrHashCode,addrDateHash",
+        "ExpressionAttributeValues": {
+          ":givenAddrHashCode": {
+            "S.$": "$.addrHashCode"
+          }
+        },
+        "KeyConditionExpression": "addrHashCode = :givenAddrHashCode",
+        "FilterExpression": "attribute_not_exists(sawbHash)"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "ResultPath": "$.UnTrackedShipmentRecords"
     },
     "Get Length of ProcessedRecords": {
       "Type": "Pass",
@@ -268,7 +311,7 @@
     },
     "Save Nested Results of SAWB": {
       "Type": "Pass",
-      "OutputPath": "$.ProcessedRecords[*].Output",
+      "OutputPath": "$.ProcessedRecords[*].ProcessedRecords.Output",
       "End": true
     }
   }

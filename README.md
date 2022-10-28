@@ -89,7 +89,7 @@ The main aggregation workflow is decoupled from the final carrier invocations us
   * All the Shipment records with associated UPS or other carrier shipment labels are saved in DynamoDB `ShipmentRecord` table. Heavy writes and reads in DynamoDB can result in throttling as DynamoDB atempts to scale the table (when using on-demand capacity). Code attempts to retry with increasing backoff rates.
 * Any repeat submissions to the Aggregation Step Function for an already processed address will return with no operations.
 
-## Requirements
+## Prerequisites
 
 * SAM CLI (details in Deploy)
 * Needs Python 3.9 available to run the SAM CLI tool (refer to https://tecadmin.net/install-python-3-9-on-amazon-linux/ for instructions).
@@ -146,17 +146,24 @@ There are 2 parts to the workflow:
 
 Steps:
 
-* Go to the testing folder.
-* Edit the target and load testing configurations in config.json file for API Gateway REST endpoint and load parameters
+* Discover the API Gateway REST endpoint created by SAM deploy to inject shipments. Go to [API Gateway service](https://console.aws.amazon.com/apigateway) page in the AWS Console, select the `AirwaysShipmentRestApi` REST Api on left hand panel, then select the `dev` stage on the navigation bar and that should report API Endpoint with stage name included. Copy the Invoke URL endpoint value (till `*..amazonaws.com`), skipping the trailing `/` and `dev` stage name).
+![](imgs/ApiGatewayRestAPIEndpoint.png)
+* Now go to the testing folder.
+* Edit the target and load testing configurations in config.json file for API Gateway REST endpoint and load parameters. Edit the target to the API endpoint created at end of the SAM deployment. Ensure there is no duplication of `https://` prefix as well as no trailing `/` or stage name.
+
 ```
 "config": {
-  "target": "https://<EDIT_ME_WITH_API_GATEWAY_ENDPOINT>.amazonaws.com",
+  "target": "<https://EDIT_ME_WITH_API_GATEWAY_ENDPOINT.amazonaws.com>",
   "phases": [
     { "name": "Generate Shipment requests", "duration": 1, "arrivalRate": 20 }
   ],
   ....
 ```
-  Edit the target to the API endpoint created at end of the SAM deployment (without any trailing `/` or stage names)
+  The post step would already have the correct `/dev` stage and actual resource path `/postshipment` prefilled inside config.json. This does not need to be modified.
+  ```
+  "post": {
+    "url": "/dev/postShipment",
+  ```
   Edit the `arrivalRate` to be small for initial testing (controls how many requests to submit in a given second)
   The duration parameter indicates how long to run the test which can be bumped up. Total number of submitted requests would be equal to (arrival rate * duration).
   The shipment payload would be dynamically substituted with addresses specified in the sample 200-addresses.csv file.
@@ -166,8 +173,8 @@ Steps:
   # Edit the AirwaysShipmentApi endpoint before running curl
   curl -X POST -H 'Content-Type: application/json' https://<AirwaysShipmentApiEndpoint>/dev/postShipment -d @sampleShippingPayload.json
   ```
-
-* Start the tests from the `testing folder` using `./runArtillery.sh` script or just run `artillery run config.json`
+* Make sure to install artillery using npm (npm intall -g artillery@latest) as mentioned in prerequisites.
+Now start the tests from the `testing folder` using `./runArtillery.sh` script or just run `artillery run config.json`
 Whenever making changes to the code or SAM templates, rerun the sam build followed by sam deploy.
 
 *2)* To kick off the aggeregation and processing of the shipments, wait for the shipment records to show up in the ShipmentRecord DDB table. There can a few failed records that goes to the ShipmentRecordDLQueue with rest being successfully inserted into ShipmentRecord table. The total ingestion process should be over in one-two minutes once artillery has completed its run.

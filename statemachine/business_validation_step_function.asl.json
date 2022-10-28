@@ -59,7 +59,7 @@
           "recordId": {
             "S.$": "$.input.recordId"
           },
-          "processTime": {
+          "shipmentSubmitTime": {
             "S.$": "$$.Execution.StartTime"
           },
           "body": {

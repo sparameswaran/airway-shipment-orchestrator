@@ -33,7 +33,8 @@
           "Reformat Parameters": {
             "Type": "Pass",
             "Parameters": {
-              "ShipmentRecordId.$": "$.Payload.Shipment.recordId.S",
+              "ShipmentRecordId.$": "$.Payload.ShipmentRecordId",
+              "ShipmentProcessSubmissionTime.$": "$.Payload.ShipmentProcessSubmissionTime",
               "UPSTrackerID.$": "$.UPSShipment.Payload.UPSShipmentTrackingCode",
               "UPSShipmentResponse.$": "$.UPSShipment.Payload.UPSShipmentTracker.ShipmentResponse",
               "UPSShipmentRequest.$": "$.UPSShipment.Payload.ShipmentRequest"
@@ -55,22 +56,25 @@
                   "S.$": "$.DerivedParams.ShipmentRecordId"
                 }
               },
-              "UpdateExpression": "SET upsTracker = :myValueRef, airwayBillNumber = :airwayBillNumber, upsShipmentResponse = :upsShipmentResponse, shipmentProcessTime = :shipmentProcessTime, addrHashCode = :addrHashCode ",
+              "UpdateExpression": "SET upsTracker = :upsTrackerId, airwayBillNumber = :airwayBillNumber, addrHashCode = :addrHashCode, upsShipmentResponse = :upsShipmentResponse, upsShipmentProcessCompletionTime = :upsShipmentProcessCompletionTime,  upsShipmentProcessSubmissionTime = :upsShipmentProcessSubmissionTime",
               "ExpressionAttributeValues": {
                 ":airwayBillNumber": {
                   "S.$": "$.Payload.AirwayBillNumber"
                 },
-                ":myValueRef": {
+                ":upsTrackerId": {
                   "S.$": "$.DerivedParams.UPSTrackerID"
+                },
+                ":addrHashCode": {
+                  "S.$": "$.Payload.AddressHash"
                 },
                 ":upsShipmentResponse": {
                   "S.$": "States.JsonToString($.DerivedParams.UPSShipmentResponse)"
                 },
-                ":shipmentProcessTime": {
+                ":upsShipmentProcessCompletionTime": {
                   "S.$": "$$.State.EnteredTime"
                 },
-                ":addrHashCode": {
-                  "S.$": "$.Payload.AddressHash"
+                ":upsShipmentProcessSubmissionTime": {
+                  "S.$": "$.Payload.ShipmentProcessSubmissionTime"
                 }
               }
             },
@@ -95,7 +99,8 @@
               "AirwayBillNumber.$": "$.Payload.AirwayBillNumber",
               "ShipmentRecordId.$": "$.DerivedParams.ShipmentRecordId",
               "UPSTrackerID.$": "$.DerivedParams.UPSTrackerID",
-              "ShipmentProcessTime.$": "$$.State.EnteredTime"
+              "ShipmentProcessSubmissionTime.$": "$.Payload.ShipmentProcessSubmissionTime",
+              "UPSShipmentProcessCompletionTime.$": "$$.State.EnteredTime"
             },
             "ResultPath": "$.myResultParameters",
             "OutputPath": "$.myResultParameters",
