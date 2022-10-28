@@ -2,8 +2,7 @@
   "Comment": "Handle Shipments by Partitions",
   "StartAt": "Start query for unprocessed shipment records",
   "States": {
-
-"Start query for unprocessed shipment records": {
+    "Start query for unprocessed shipment records": {
       "Type": "Task",
       "Next": "Map",
       "Parameters": {
@@ -49,19 +48,19 @@
               "Next": "Save Processed ShipmentRequests"
             },
             "Save Processed ShipmentRequests": {
-            "Type": "Pass",
-            "Parameters": {
-              "ShipmentRecordId.$": "$.Shipment.recordId.S",
-              "AddressHash.$": "$.AddressHash",
-              "AddressDateHash.$": "$.AddressDateHash",
-              "AirwayBillNumber.$": "$.AirwayBillNumber",
-              "ShipmentProcessSubmissionTime.$": "$$.State.EnteredTime"
-            },
-            "ResultPath": "$.ProcessedRecords",
-            "OutputPath": "$.ProcessedRecords",
-            "End": true
+              "Type": "Pass",
+              "Parameters": {
+                "ShipmentRecordId.$": "$.Shipment.recordId.S",
+                "AddressHash.$": "$.AddressHash",
+                "AddressDateHash.$": "$.AddressDateHash",
+                "AirwayBillNumber.$": "$.AirwayBillNumber",
+                "ShipmentProcessSubmissionTime.$": "$$.State.EnteredTime"
+              },
+              "ResultPath": "$.ProcessedRecords",
+              "OutputPath": "$.ProcessedRecords",
+              "End": true
+            }
           }
-        }
       },
       "ItemsPath": "$.UnTrackedShipmentRecords.Items",
       "Parameters": {

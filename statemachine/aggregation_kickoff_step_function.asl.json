@@ -104,14 +104,10 @@
           }
         }
       },
-      "Next": "Save Results of Aggregator",
       "ItemsPath": "$.HashIdList",
-      "ResultPath": "$.ProcessedRecords"
-    },
-    "Save Results of Aggregator": {
-      "Type": "Pass",
-      "OutputPath": "$.ProcessedRecords[*].Output",
+      "OutputPath": "$.HashIdList",
+      "ResultPath": null,
       "End": true
     }
-  }
+   }
 }

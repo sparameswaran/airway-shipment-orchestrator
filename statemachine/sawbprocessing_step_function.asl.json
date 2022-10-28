@@ -211,7 +211,7 @@
           "Update ShipmentHash As Processed with ShipmentRecord": {
             "Type": "Task",
             "Resource": "arn:aws:states:::dynamodb:updateItem",
-            "ResultPath": "$.GroupShipmentHashUpdate",
+            "ResultPath": null,
             "Parameters": {
               "TableName": "${ShipmentHashTable}",
               "Key": {
@@ -243,6 +243,11 @@
                 "Comment": "Retry DDB inserts/updates"
               }
             ],
+            "Next": "Save Processed Results of shipments"
+          },
+          "Save Processed Results of shipments": {
+            "Type": "Pass",
+            "OutputPath": "$.ProcessedRecords",
             "End": true
           }
         }
@@ -311,7 +316,7 @@
     },
     "Save Nested Results of SAWB": {
       "Type": "Pass",
-      "OutputPath": "$.ProcessedRecords[*].ProcessedRecords.Output",
+      "OutputPath": "$.ProcessedRecords[*].Output",
       "End": true
     }
   }
