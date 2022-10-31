@@ -32,6 +32,12 @@ Parameters:
     Type: String
     Description: 'Name of the AWS DynamoDB Table for storing the shipment records'
     Default: ShipmentRecord
+
+  InvalidShipmentRecordTableName:
+    Type: String
+    Description: 'Name of the AWS DynamoDB Table for storing the invalid shipment records'
+    Default: InvalidShipmentRecord
+
   ShipmentHashTableName:
     Type: String
     Description: 'Name of the AWS DynamoDB Table for storing the shipment hashes'
@@ -192,6 +198,26 @@ Resources:
       Tags:
         - Key: Name
           Value: ShipmentRecordTable
+
+  InvalidShipmentRecordDDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref InvalidShipmentRecordTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: recordId
+          AttributeType: S
+        - AttributeName: addrDateHash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: addrDateHash
+          KeyType: HASH
+        - AttributeName: recordId
+          KeyType: RANGE
+      Tags:
+        - Key: Name
+          Value: InvalidShipmentRecordTable
+
   AirwaysShipmentDetailDDB:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -283,6 +309,7 @@ Resources:
                 Resource: [
                   !GetAtt ShipmentHashDDB.Arn,
                   !GetAtt ShipmentRecordDDB.Arn,
+                  !GetAtt InvalidShipmentRecordDDB.Arn,
                   !GetAtt AirwaysShipmentDetailDDB.Arn
                 ]
         - PolicyName: SQS-SNSInvoke
@@ -391,6 +418,7 @@ Resources:
                 Resource: [
                   !GetAtt ShipmentHashDDB.Arn,
                   !GetAtt ShipmentRecordDDB.Arn,
+                  !GetAtt InvalidShipmentRecordDDB.Arn,
                   !GetAtt AirwaysShipmentDetailDDB.Arn
                 ]
               - Effect: Allow
@@ -450,6 +478,7 @@ Resources:
         Variables:
           SHIPMENT_HASH_TABLE: !Ref ShipmentHashDDB
           SHIPMENT_RECORD_TABLE: !Ref  ShipmentRecordDDB
+          INVALID_SHIPMENT_RECORD_TABLE: !Ref InvalidShipmentRecordDDB
           AIRWAYS_SHIPMENT_TABLE: !Ref AirwaysShipmentDetailDDB
       Role: !GetAtt LambdaExecutionRole.Arn
 
@@ -642,6 +671,7 @@ Resources:
         ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
         ShipmentManualResubmitQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordManualResubmitQueueName  ] ]
         ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName  ] ]
+        InvalidShipmentRecordTable: !Ref InvalidShipmentRecordDDB
 
   TriggerShipmentAggregationKickOffFunction:
     Type: AWS::Serverless::Function

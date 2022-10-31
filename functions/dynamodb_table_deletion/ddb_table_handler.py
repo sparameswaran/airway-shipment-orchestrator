@@ -5,6 +5,7 @@ import uuid
 
 SHIPMENT_HASH_TABLE = os.getenv('SHIPMENT_HASH_TABLE')
 SHIPMENT_RECORD_TABLE = os.getenv('SHIPMENT_RECORD_TABLE')
+INVALID_SHIPMENT_RECORD_TABLE = os.getenv('INVALID_SHIPMENT_RECORD_TABLE')
 AIRWAYS_SHIPMENT_TABLE = os.getenv('AIRWAYS_SHIPMENT_TABLE')
 
 dynamodb = boto3.resource('dynamodb')
@@ -213,6 +214,7 @@ def lambda_handler(event, context):
     # Faster to recreate Tables with on-demand capacity
     recreateTable(AIRWAYS_SHIPMENT_TABLE, 'shipmentRecordID', None)
     recreateTable(SHIPMENT_RECORD_TABLE, 'addrDateHash', 'recordId')
+    recreateTable(INVALID_SHIPMENT_RECORD_TABLE, 'addrDateHash', 'recordId')
     recreateTable(SHIPMENT_HASH_TABLE, 'addrHashCode', 'addrDateHash')
 
 

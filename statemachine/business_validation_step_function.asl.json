@@ -8,7 +8,7 @@
         {
           "Variable": "$.input.errors",
           "IsPresent": true,
-          "Next": "Choice"
+          "Next": "Save Invalid Shipment Record"
         }
       ],
       "Default": "Save Hash in ShipmentHash"
@@ -80,7 +80,40 @@
       ],
       "End": true
     },
-    "Choice": {
+  "Save Invalid Shipment Record": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "${InvalidShipmentRecordTable}",
+        "Item": {
+          "addrDateHash": {
+            "S.$": "$.input.addrHash.addrDateHash"
+          },
+          "recordId": {
+            "S.$": "$.input.recordId"
+          },
+          "shipmentSubmitTime": {
+            "S.$": "$$.Execution.StartTime"
+          },
+          "body": {
+            "S.$": "States.JsonToString($.input)"
+          }
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 6,
+          "Comment": "Retry DDB inserts/updates"
+        }
+      ],
+      "Next": "Handle based on Error type"
+    },
+    "Handle based on Error type": {
       "Type": "Choice",
       "Choices": [
         {
