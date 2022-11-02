@@ -258,7 +258,7 @@
         "AddressHash.$": "$.addrHashCode",
         "AirwayBillNumber.$": "$.AirwayBill.AirwayBillResponse.sawb_bill_number"
       },
-      "ResultPath": "$.ProcessedRecords"
+      "ResultPath": null
     },
     "Check for additional Address Date map entries": {
       "Type": "Choice",
