@@ -247,7 +247,7 @@
           },
           "Save Processed Results of shipments": {
             "Type": "Pass",
-            "OutputPath": "$.ProcessedRecords",
+            "OutputPath": "$.ProcessedRecords.Output",
             "End": true
           }
         }
@@ -316,7 +316,7 @@
     },
     "Save Nested Results of SAWB": {
       "Type": "Pass",
-      "OutputPath": "$.ProcessedRecords[*].Output",
+      "OutputPath": "$.ProcessedRecords[*]",
       "End": true
     }
   }

@@ -7,7 +7,7 @@
       "Next": "Map",
       "Parameters": {
         "TableName": "${ShipmentRecordTable}",
-        "ProjectionExpression": "processTime,recordId,addrDateHash,body",
+        "ProjectionExpression": "recordId,addrDateHash",
         "ExpressionAttributeValues": {
           ":addrDateHash": {
             "S.$": "$.AddressDateHash"
@@ -31,7 +31,6 @@
                 "TopicArn": "${ShipmentCarrierSNSTopic}",
                 "Message": {
                   "ShipmentRecordId.$": "$.Shipment.recordId.S",
-                  "ShipmentRequest.$": "$.Shipment.body.S",
                   "AddressHash.$": "$.AddressHash",
                   "AddressDateHash.$": "$.AddressDateHash",
                   "AirwayBillNumber.$": "$.AirwayBillNumber",
