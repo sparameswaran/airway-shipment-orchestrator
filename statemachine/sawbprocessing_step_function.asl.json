@@ -268,7 +268,7 @@
             "Variable": "$.RemainingAddressDateMap.LastEvaluatedKey",
             "IsPresent": true
           },
-          "Next": "Get Length of ProcessedRecords"
+          "Next": "Finished"
         }
       ],
       "Default": "Continue query for additional Address Date map entries"
@@ -290,33 +290,9 @@
       "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
       "ResultPath": "$.UnTrackedShipmentRecords"
     },
-    "Get Length of ProcessedRecords": {
+    "Finished": {
       "Type": "Pass",
-      "Parameters": {
-        "ProcessedRecordsLen.$": "States.ArrayLength($.ProcessedRecords)"
-      },
-      "ResultPath": "$.ProcessedRecordsLen",
-      "Next": "Check for Outputs in ProcessedRecords"
-    },
-    "Check for Outputs in ProcessedRecords": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.ProcessedRecordsLen.ProcessedRecordsLen",
-          "NumericEquals": 0,
-          "Next": "Pass Outer ProcessedRecords from SAWB"
-        }
-      ],
-      "Default": "Save Nested Results of SAWB"
-    },
-    "Pass Outer ProcessedRecords from SAWB": {
-      "Type": "Pass",
-      "OutputPath": "$.ProcessedRecords",
-      "End": true
-    },
-    "Save Nested Results of SAWB": {
-      "Type": "Pass",
-      "OutputPath": "$.ProcessedRecords[*]",
+      "OutputPath": "$.addrHashCode",
       "End": true
     }
   }
