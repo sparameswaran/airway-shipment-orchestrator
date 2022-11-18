@@ -4,7 +4,7 @@
   "States": {
     "WaitForQueueToFill": {
       "Type": "Wait",
-      "Seconds": 15,
+      "Seconds": 5,
       "Next": "Check Queue Depth"
     },
     "Check Queue Depth": {
@@ -51,15 +51,37 @@
         {
           "Variable": "$.Attributes.ApproximateNumberOfMessages ",
           "StringEquals": "0",
-          "Next": "Check Shipment Groups"
+          "Next": "Reset AirwaysShipment Shadow table"
         }
       ],
       "Default": "Check Queue Depth"
     },
     "Long Wait": {
       "Type": "Wait",
-      "Seconds": 15,
+      "Seconds": 10,
       "Next": "Check Queue Depth"
+    },
+    "Reset AirwaysShipment Shadow table": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${ResetSAWBShadowTableHandlerFunction}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Check Shipment Groups"
     },
     "Check Shipment Groups": {
       "Type": "Task",

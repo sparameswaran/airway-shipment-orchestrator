@@ -46,6 +46,11 @@ Parameters:
     Type: String
     Description: 'Name of the AWS DynamoDB Table for storing the Airways shipment labels'
     Default: AirwaysShipmentDetail
+  AirwaysShipmentDetailShadowTableName:
+    Type: String
+    Description: 'Name of the AWS DynamoDB Shadow Table for storing the Airways shipment labels'
+    Default: AirwaysShipmentDetailShadow
+
   MaxSubPartitionsForAddresses:
     Type: Number
     Description: 'Max number of sub-partitions for given destination address in DDB'
@@ -233,6 +238,22 @@ Resources:
         - Key: Name
           Value: AirwaysShipmentDetail
 
+
+  AirwaysShipmentDetailShadowDDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref AirwaysShipmentDetailShadowTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: shipmentRecordID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: shipmentRecordID
+          KeyType: HASH
+      Tags:
+        - Key: Name
+          Value: AirwaysShipmentDetailShadow
+
   StepFunctionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -310,7 +331,8 @@ Resources:
                   !GetAtt ShipmentHashDDB.Arn,
                   !GetAtt ShipmentRecordDDB.Arn,
                   !GetAtt InvalidShipmentRecordDDB.Arn,
-                  !GetAtt AirwaysShipmentDetailDDB.Arn
+                  !GetAtt AirwaysShipmentDetailDDB.Arn,
+                  !GetAtt AirwaysShipmentDetailShadowDDB.Arn
                 ]
         - PolicyName: SQS-SNSInvoke
           PolicyDocument:
@@ -419,7 +441,8 @@ Resources:
                   !GetAtt ShipmentHashDDB.Arn,
                   !GetAtt ShipmentRecordDDB.Arn,
                   !GetAtt InvalidShipmentRecordDDB.Arn,
-                  !GetAtt AirwaysShipmentDetailDDB.Arn
+                  !GetAtt AirwaysShipmentDetailDDB.Arn,
+                  !GetAtt AirwaysShipmentDetailShadowDDB.Arn
                 ]
               - Effect: Allow
                 Action:
@@ -482,6 +505,36 @@ Resources:
           AIRWAYS_SHIPMENT_TABLE: !Ref AirwaysShipmentDetailDDB
       Role: !GetAtt LambdaExecutionRole.Arn
 
+  SAWBShadowTableLookupHandlerFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: [ LambdaExecutionRole ]
+    Properties:
+      FunctionName: SAWBShadowTableLookupFunction
+      CodeUri: functions/sawblookup/
+      Handler: sawb_lookup_handler.findLatestAirwayShipment
+      Runtime: python3.9
+      Timeout: 30
+      Environment:
+        Variables:
+          AIRWAYS_SHIPMENT_SHADOW_TABLE: !Ref AirwaysShipmentDetailShadowDDB
+          ACTIVE_TIME_WINDOW_IN_MINUTES: 5
+      Role: !GetAtt LambdaExecutionRole.Arn
+
+  ResetSAWBShadowTableHandlerFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: [ LambdaExecutionRole ]
+    Properties:
+      FunctionName: ResetAirwaysShipmentDetailShadowFunction
+      CodeUri: functions/sawblookup/
+      Handler: sawb_shadow_cleanup.deleteTableContent
+      Runtime: python3.9
+      Timeout: 30
+      Environment:
+        Variables:
+          AIRWAYS_SHIPMENT_SHADOW_TABLE: !Ref AirwaysShipmentDetailShadowDDB
+      Role: !GetAtt LambdaExecutionRole.Arn
+
+
   OrderValidatorFunction:
     Type: AWS::Serverless::Function
     DependsOn: [ LambdaExecutionRole, ShipmentRecordQueue ]
@@ -494,6 +547,7 @@ Resources:
       Environment:
         Variables:
           BUSINESS_VALIDATION_STEPFUNCTION: !GetAtt BusinessValidationStateMachine1.Arn
+          AIRWAYS_SHIPMENT_WORKFLOW_STEPFUNCTION: !GetAtt AirwayShipmentWorkflowStateMachine1.Arn
           MAX_PARTITION_RANGE: !Ref MaxSubPartitionsForAddresses
       Role: !GetAtt LambdaExecutionRole.Arn
       Events:
@@ -635,6 +689,28 @@ Resources:
         ShipmentHashTable: !Ref ShipmentHashDDB
         ShipmentRecordTable: !Ref ShipmentRecordDDB
         AirwaysShipmentTable: !Ref AirwaysShipmentDetailDDB
+        AirwaysShipmentShadowTable: !Ref AirwaysShipmentDetailShadowDDB
+        BusinessRulesValidator: !GetAtt OrderValidatorFunction.Arn
+        ShipmentAddressDateGrouperFunction: !GetAtt ShipmentAddressDateGrouperFunction.Arn
+        ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
+        ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName  ] ]
+        SAWBHandler: !GetAtt AirwayShipmentGeneratorFunction.Arn
+        InventoryHandler: !GetAtt InventoryHandlerFunction.Arn
+        SupplierHandler: !GetAtt SupplierHandlerFunction.Arn
+        UPSShipperService: !GetAtt UPSShipperFunction.Arn
+        ShipmentPartitionHandlerStepFunction: !GetAtt ShipmentPartitionHandlerStateMachine4.Arn
+
+  SAWBProcessorStandaloneStateMachine3:
+    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    Properties:
+      Name: SAWBProcessorStandaloneStateMachine3
+      DefinitionUri: statemachine/sawbprocessing_standalone_step_function.asl.json
+      Role: !GetAtt StepFunctionRole.Arn
+      DefinitionSubstitutions:
+        ShipmentHashTable: !Ref ShipmentHashDDB
+        ShipmentRecordTable: !Ref ShipmentRecordDDB
+        AirwaysShipmentTable: !Ref AirwaysShipmentDetailDDB
+        AirwaysShipmentShadowTable: !Ref AirwaysShipmentDetailShadowDDB
         BusinessRulesValidator: !GetAtt OrderValidatorFunction.Arn
         ShipmentAddressDateGrouperFunction: !GetAtt ShipmentAddressDateGrouperFunction.Arn
         ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
@@ -653,9 +729,10 @@ Resources:
       DefinitionUri: statemachine/aggregation_kickoff_step_function.asl.json
       Role: !GetAtt StepFunctionRole.Arn
       DefinitionSubstitutions:
-        SWABProcessorStepFunction: !GetAtt SAWBProcessorStateMachine3.Arn
+        SWABProcessorStepFunction: !GetAtt SAWBProcessorStandaloneStateMachine3.Arn
         ShipmentAddressGrouperFunction: !GetAtt ShipmentAddressGrouperFunction.Arn
         ShipmentAddressDateGrouperFunction: !GetAtt ShipmentAddressDateGrouperFunction.Arn
+        ResetSAWBShadowTableHandlerFunction: !GetAtt ResetSAWBShadowTableHandlerFunction.Arn
         ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
         ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName ] ]
 
@@ -672,6 +749,22 @@ Resources:
         ShipmentManualResubmitQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordManualResubmitQueueName  ] ]
         ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName  ] ]
         InvalidShipmentRecordTable: !Ref InvalidShipmentRecordDDB
+
+  AirwayShipmentWorkflowStateMachine1:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: AirwayShipmentWorkflowStateMachine1
+      DefinitionUri: statemachine/airways_shipment_workflow_step_function.asl.json
+      Role: !GetAtt StepFunctionRole.Arn
+      DefinitionSubstitutions:
+        ShipmentHashTable: !Ref ShipmentHashDDB
+        ShipmentRecordTable: !Ref ShipmentRecordDDB
+        ShipmentQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordQueueName ] ]
+        ShipmentManualResubmitQueueUrl: !Join [ "/", [ "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordManualResubmitQueueName  ] ]
+        ShipmentDLQueueUrl: !Join [ "/", [ !Sub "https://sqs.${AWS::Region}.amazonaws.com", !Ref AWS::AccountId, !Ref ShipmentRecordDLQueueName  ] ]
+        InvalidShipmentRecordTable: !Ref InvalidShipmentRecordDDB
+        SAWBShadowTableLookupHandlerFunction: !GetAtt SAWBShadowTableLookupHandlerFunction.Arn
+        ShipmentCarrierSNSTopic: !Ref ShipmentCarrierTopic
 
   TriggerShipmentAggregationKickOffFunction:
     Type: AWS::Serverless::Function

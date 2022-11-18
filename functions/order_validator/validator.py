@@ -8,7 +8,8 @@ import random
 import time
 
 client = boto3.client('stepfunctions')
-stateMachineArn = os.getenv('BUSINESS_VALIDATION_STEPFUNCTION')
+#stateMachineArn = os.getenv('BUSINESS_VALIDATION_STEPFUNCTION')
+stateMachineArn = os.getenv('AIRWAYS_SHIPMENT_WORKFLOW_STEPFUNCTION')
 MAX_PARTITION_RANGE = int(os.getenv('MAX_PARTITION_RANGE', 10))
 
 def lambda_handler(event, context):

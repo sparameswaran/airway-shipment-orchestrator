@@ -1,0 +1,191 @@
+{
+  "Comment": "SAWB Processing state machine",
+  "StartAt": "Invoke SAWB",
+  "States": {
+    "Invoke SAWB": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultSelector": {
+        "AirwayBillResponse.$": "$.Payload"
+      },
+      "ResultPath": "$.AirwayBill",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${SAWBHandler}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Save ShipmentBill"
+    },
+    "Save ShipmentBill": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "ResultPath": null,
+      "Parameters": {
+        "TableName": "${AirwaysShipmentTable}",
+        "Item": {
+          "addrDateHash": {
+            "S.$": "$.AirwayBill.AirwayBillResponse.addrDateHash"
+          },
+          "processDate": {
+            "S.$": "$.AirwayBill.AirwayBillResponse.processDate"
+          },
+          "processTime": {
+            "S.$": "$.AirwayBill.AirwayBillResponse.processTime"
+          },
+          "shipmentRecordID": {
+            "S.$": "$.AirwayBill.AirwayBillResponse.sawb_bill_number"
+          },
+          "processTime": {
+            "S.$": "$$.State.EnteredTime"
+          },
+          "body": {
+            "S.$": "States.JsonToString($.AirwayBill)"
+          }
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 6,
+          "Comment": "Retry DDB inserts/updates"
+        }
+      ],
+       "Next": "Save ShipmentBill in Shadow Table"
+    },
+    "Save ShipmentBill in Shadow Table": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "ResultPath": null,
+      "Parameters": {
+        "TableName": "${AirwaysShipmentShadowTable}",
+        "Item": {
+          "addrDateHash": {
+            "S.$": "$.AirwayBill.AirwayBillResponse.addrDateHash"
+          },
+          "processDate": {
+            "S.$": "$.AirwayBill.AirwayBillResponse.processDate"
+          },
+          "processTime": {
+            "S.$": "$.AirwayBill.AirwayBillResponse.processTime"
+          },
+          "shipmentRecordID": {
+            "S.$": "$.AirwayBill.AirwayBillResponse.sawb_bill_number"
+          },
+          "processTime": {
+            "S.$": "$$.State.EnteredTime"
+          },
+          "body": {
+            "S.$": "States.JsonToString($.AirwayBill)"
+          }
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 6,
+          "Comment": "Retry DDB inserts/updates"
+        }
+      ],
+      "Next": "Invoke Inventory"
+    },
+    "Invoke Inventory": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultSelector": {
+        "inventory.$": "$.Payload.Inventory"
+      },
+      "ResultPath": "$.InventoryResult",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${InventoryHandler}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Choice"
+    },
+    "Choice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.InventoryResult.inventory.available",
+          "IsPresent": false,
+          "Next": "ReplaceSupplier"
+        }
+      ],
+      "Default": "GoWithSupplier"
+    },
+    "GoWithSupplier": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${SupplierHandler}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+       "End": true
+    },
+    "ReplaceSupplier": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.UPSShippingResponse",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${SupplierHandler}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "End": true
+    }
+  }
+}
