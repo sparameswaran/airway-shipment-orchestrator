@@ -17,7 +17,7 @@
       "flow": [
         {
           "post": {
-            "url": "/dev/postShipment",
+            "url": "/dev/postShipment/OEM1",
             "json": {
 
             "interchanges": [

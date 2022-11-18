@@ -5,7 +5,7 @@ This sample project demonstrates airway shipment orchestration using AWS Serverl
 ##  Project structure
 The project contains source code and supporting files that you can deploy with the SAM CLI to build and test the sample application. It includes the following files and folders:
 * functions - AWS Lambda functions to handle processing of shipments requests from SQS and integration with various backend systems (including UPS shipping api).
-* statemachines - Definition for the AWS Step Functions that orchestrates the complex workflow of managing multiple Lambda and nested AWS child Step Functions.
+* statemachine - Definition for the AWS Step Functions that orchestrates the complex workflow of managing multiple Lambda and nested AWS child Step Functions.
 * template.yaml - A SAM template that defines the application's AWS resources.
 * testing - folder that contains artillery test configuration script for injecting requests into the system along with CloudWatch dashboard json template for monitoring various resources.
 
@@ -16,19 +16,17 @@ High level architecture:
 ![](imgs/AirwaysShipmentWorkflow-HighlevelArch.png)
 
 ### Step Functions:
-* `BusinessValidationStateMachine1` initially checks for validation errors and decides on normal processing, or manual resubmission or error processing based on validation errors. It creates an address hash based on shipment address along with a date + random partition hash (as there can be large number of shipments to same destination). It saves the individual records, hashes and shipment address in DynamoDB. Failed validations are passed onto Dead Letter Queue or different queues based on type of validation errors.
-![](imgs/BusinessValidationStateMachine1.png)
+* `AirwayShipmentWorkflowStateMachine1` initially checks for validation errors and decides on normal processing, or manual resubmission or error processing based on validation errors. It creates an address hash based on shipment address along with a date + random partition hash (as there can be large number of shipments to same destination). It saves the individual records, hashes and shipment address in DynamoDB. Then it waits for a Airways shipment bill to be generated for the destination address thats recent enough (handled by another state machine) before proceeding with association of the SAWB (shipment airways bill) with the actual shipment by the carrier using SNS. Failed validations are passed onto Dead Letter Queue or different queues based on type of validation errors.
 
-* `AggregationKickoffStateMachine2` aggregates the orders based on destination address for processing once the batch of shipments have been validated. This can be kicked off manually once we know the batch of shipment records has been validated and saved. For each unique shipment address in the batch, an instance of `SAWBProcessorStateMachine3` would be created using Step Funtion's Map construct. The AggregationKickoff Step Function invocation has to be done just once per submitted batch with no real inputs required for the AggregationKickoff state machine.
+Once the Airway shipment bill is associated with the shipment, it then fires off a SNS notification for handling by associated Carriers. The Carrier Notification SNS topic in turn publishes to a Shipment Carrier Queue. There can be multiple  subscribers for the SNS Topic (example: UPS, Fedex, USPS etc.) and each carrier workflow to handle the shipments can work at same time in a disconnected manner as the SNS/SQS decouples it from the main aggregation from actual carrier shipping operations.
+![](imgs/AirwayShipmentWorkflowStateMachine1.png)
 
-Option to automatically trigger the StepFunction based on number of shipments received in the `ShipmentRecordQueue` is also suported. Once the messages received in a minute grows beyond 300 (monitored using CloudWatch SQS related Metrics), it goes into alarm state and an alarm event gets published to a SNS topic that in turn invokes a Lambda function to trigger the Step Function execution. Edit the SAM template to tweak the alarm thresholds. For low volume testing, the 300 shipments might not be reached and in those cases, a manual trigger of the StepFunction execution would be required.
+* `AggregationKickoffStateMachine2` aggregates the orders based on destination address for processing once the batch of shipments have been validated. This can be kicked off manually once we know the specific OEM vendor handling the batch of shipment records that has been validated and saved. Invoke it using a json construct mentioning 'OEM' as  the key (Sample input: `{ "OEM": "MyTestOEM1" }` ). For each unique shipment address in the batch, an instance of `SAWBProcessorStandaloneStateMachine3` would be created using Step Function's Map construct. The AggregationKickoff Step Function invocation has to be done just once per submitted batch with the OEM for the AggregationKickoff state machine.
+
 <img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/AggregationKickoffStateMachine2.png" width=25% height=25%>
 
-* `SAWBProcessorStateMachine3` handles Airway shipment generation per unique destination address. Then it starts handling the shipments using a Map construct in Step Functions to handle the individual line items associated with an unique shipment address and assigned date + random partition. It takes an input argument of an existing hash of destination addresses partitions.
-<img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/SAWBProcessorStateMachine3.png" width=25% height=25%>
-
-* `ShipmentPartitionHandlerStateMachine4` associates the Airway shipment bill  with the shipment and then fires off a SNS notification for handling by associated Carriers. The Carrier Notification SNS topic in turn publishes to a Shipment Carrier Queue. There can be multiple  subscribers for the SNS Topic (example: UPS, Fedex, USPS etc.) and each carrier workflow to handle the shipments can work at same time in a disconnected manner as the SNS/SQS decouples it from the main aggregation from actual carrier shipping operations.
-<img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/ShipmentPartitionHandlerStateMachine4.png" width=25% height=25%>
+* `SAWBProcessorStateMachine3` handles Airway shipment bill generation per unique destination address. Then it saves the shipment bill into two tables - AirwayShipmentDetail and AirwayShipmentDetailShadow (just ongoing shipment bills that would be cleaned on each new aggregation kickoff). It takes an input argument of an existing hash of destination addresses partitions. Depending on available inventory, it would choose to go with existing or replacement supplier.
+<img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/SAWBProcessorStandaloneStateMachine3.png" width=25% height=25%>
 
 * `UPSShipmentHandlerStateMachine5` is the carrier specific workflow to handle the shipments by invoking actual carrier service endpoint and then associating the carrier tracker id and shipping response with the shipment.
 <img src="https://github.com/sparameswaran/airway-shipment-orchestrator/blob/dev/imgs/UPSShipmentHandlerStateMachine5.png" width=25% height=25%>
@@ -48,17 +46,21 @@ All the below tables are configured with on-demand capacity to handle large thro
 
 * `AirwaysShipmentDetail` contains the airway shipment bill generated per unique address against the aggregated shipments for a given batch submission.
 
+* `AirwaysShipmentDetailShadow` contains the current active set of airway shipment bill generated per unique address against the aggregated shipments for a given batch submission that gets cleaned up on every new OEM shipment aggregation kickoff.
+
 ![](imgs/DynamoDB-Structure.png)
 
 ### Key API Gateway and Lambda Functions
-* `AirwaysShipmentRestAPI` is an AWS APIGateway endpoint that accepts individual shipment records over a REST endpoint for submission to the `ShipmentRecordQueue` SQS Destination.
+* `AirwaysShipmentRestAPI` is an AWS APIGateway endpoint that accepts individual shipment records over a REST endpoint for submission to the `ShipmentRecordQueue` SQS Destination. Based on the OEM vendor, it would attach a message attribute to indicate the OEM vendor to the SQS publish.
 ![](imgs/APIGateway-Config.png)
 
-* `OrderValidationFunction` AWS Lambda Function consumes the shipment records from the `ShipmentRecordQueue` (submitted manually or via API Gateway integration) SQS Queue and validates the records before kicking off the `BusinessValidationStateMachine` for further processing per record.
+* `OrderValidationFunction` AWS Lambda Function consumes the shipment records from the `ShipmentRecordQueue` (submitted manually or via API Gateway integration) SQS Queue and validates the records before kicking off the `AirwayShipmentWorkflowStateMachine1` for further processing per record.
 
 * `AirwayShipmentGeneratorFunction` generates the airway shipment record while the Inventory/Supplier act as minor function for generating existing inventory and supplier information;
 
-* `ShipmentAddressGrouperFunction` and `ShipmentAddressDateGrouperFunction` are functions to lookup shipments by just destination address or along with the random partition that have not been assocaited with a carrier.
+* `SAWBShadowTableLookupFunction` lookups the latest airways shipment bill that matches a given OEM vendor (needs to have been generated within last 5 minutes or other user specified time window). This function is used by the AirwayShipmentWorkflowStateMachine1 to check and retry for the airway shipment bill generation in a loop before proceeding with association of the bill with individual shipment and SNS publish for carrier handling.
+
+* `ShipmentAddressGrouperFunction` and `ShipmentAddressDateGrouperFunction` are functions to lookup shipments by just destination address or along with the random partition that have not been associated with a carrier.
 
 * `UPSShipperFunction` is the UPS shipment handler function invoking UPS. Due to rate limits, it simulates the UPS Shipping response rather than actually hitting the UPS shipping endpoint. To truly invoke UPS, edit the environment variable `SIMULATE` to `false`, and also edit the client API ID and Secret and related Shipper Account Number with valid entries before redeploying the function.
 
@@ -66,27 +68,24 @@ All the below tables are configured with on-demand capacity to handle large thro
 Detailed architecture:
 ![](imgs/AirwaysShipmentWorkflow.png)
 
-The design allows Divide and Conquer using Child Step Functions to handle each distinct shipment address and further dividing the shipments using sub-partition based on date and some random numbers to ensure a single Step Function does not hit its [25K max execution event history](https://docs.aws.amazon.com/step-functions/latest/dg/bp-history-limit.html) while also increasing the parallelism using [Map](https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-map-state.html) constructs to fire off additional child step functions. The design was tested against 20K shipment requests with majority going to a specific destination address.
-
 The DynamoDB tables are created with on-demand capacity rather than provisioned to allows scaling on demand with higher loads. Additional reason for sub-partitioning is to avoid Hot Partition Key problem with DynamoDB when majority of the shipments go to the same destination address compared to rest.
 
-The main aggregation workflow is decoupled from the final carrier invocations using SNS Topic + SQS Queue. This design allows plugging in different carrier implementations with message filtering/selection and implementing routing to appropriate carrier, and enabling buffering and throttling when dealing with carriers without affecting main aggregation workflow.
+The individual shipment validation and aggregation workflow are decoupled from the final carrier invocations using SNS Topic + SQS Queue. This design allows plugging in different carrier implementations with message filtering/selection and implementing routing to appropriate carrier, and enabling buffering and throttling when dealing with carriers without affecting main aggregation workflow.
 ![](imgs/StepFunctionMapStructure.png)
 
 * Airways Shipment system accepts individual shipment requests via an API endpoint (deployed via SAM template) that gets saved as individual messages in `ShipmentRecordQueue` SQS Queue.
 * `OrderValidatorFunction` Lambda function subscribed to the `ShipmentRecordQueue` SQS Queue consumes the batch of messages and starts validating the entries and marks errors as required.
-  * For each individual message, the function creates a hash based on the shipping destination address.
-  * It then invokes `BusinessValidationStateMachine1` Step Function for each individual message passing along the actual shipment record, address hash along with any validation errors.
-* `BusinessValidationStateMachine1` Step Function goes through a decision tree to either process normally, and for invalid shipment submissions, save them in `InvalidShipmentRecord` table before deciding error handling via a Dead Letter Queue (DLQ) (`ShipmentRecordDLQueue`) or manual resubmission via  a different queue (`ShipmentRecordManualResubmitQueueName`) based on the error type.
-* Fully validated and error free shipments are then saved in DynamoDB Tables. The specific Address Hash is saved in `ShipmentHash` table with status indicating it was not processed while the complete message including the shipment record and addr hash is saved in `ShipmentRecord` table.
-* Once all the messages have been validated and saved using the above 2 services, the messages can be aggregated and processed for actual shipment.
-* The `AggregationKickoffStateMachine2` is invoked (no need for actual payload) and it queries DynamoDB `ShipmentHash` table for unprocessed unique addresses.
+  * For each individual message, the function creates a hash based on the shipping destination address and OEM vendor (passed as a SQS Message attribute along with actual shipment payload).
+  * It then invokes `AirwayShipmentWorkflowStateMachine1` Step Function for each individual message passing along the actual shipment record, address hash along with any validation errors.
+* `AirwayShipmentWorkflowStateMachine1` Step Function goes through a decision tree to either process normally, and for invalid shipment submissions, save them in `InvalidShipmentRecord` table before deciding error handling via a Dead Letter Queue (DLQ) (`ShipmentRecordDLQueue`) or manual resubmission via  a different queue (`ShipmentRecordManualResubmitQueueName`) based on the error type.
+* Fully validated and error free shipments are then saved in DynamoDB Tables. The specific Address Hash is saved in `ShipmentHash` table with status indicating it was not processed while the complete message including the shipment record and address hash is saved in `ShipmentRecord` table.
+* Once all the messages have been validated and saved using the above 2 services, it then checks for most recent airways shipment bill using the `SAWBShadowTableLookupFunction` function with a retry and exponential backoff logic mechanism. Once the shipment bill is available that matches the OEM vendor of the shipment, a message is published to the `ShipmentCarrierTopic` Topic that allows the actual carrier to handle the shipping. The Topic publishes to `ShipmentCarrierQueue` which gets picked by a ShipmentCarrier Lambda that in turn triggers UPS Carrier Shipping related workflow service.
+* The `AggregationKickoffStateMachine2` is invoked (with an OEM indictor as payload) and it queries DynamoDB `ShipmentHash` table for unprocessed unique addresses.
 * The list of address hashes along with the random partitions is passed to a Map function.
-  * For each unique address hash + partition discovered, a child step function `SAWBProcessorStateMachine3` is invoked to handle the actual airway shipment bill generation and for each entry going to the same address, UPS shipping service needs to be invoked with the relevant payload.
+  * For each unique address hash + partition discovered that matches the OEM vendor, a child step function `SAWBProcessorStandaloneStateMachine3` is invoked to handle the actual airway shipment bill generation and for each entry going to the same address.
   * `SAWBProcessorStateMachine3` handles generation of the Airway Shipment Bill using Lambda function `AirwayShipmentGeneratorFunction` (the shipment bill gets saved in `AirwaysShipmentDetail` table in DynamoDB) and then checks if inventory is available for that shipment for default supplier and switches the supplier as necessary before passing to another Map step that iterates over the individual shipment entries that are being sent via UPS to the same address.
-  * For each shipment, a message is published to the `ShipmentCarrierTopic` Topic that allows the actual carrier to handle the shipping. The Topic publishes to `ShipmentCarrierQueue` which gets picked by a ShipmentCarrier Lambda that in turn triggers UPS Carrier Shipping related workflow service.
   * `UPSShipmentHandlerStateMachine5` gets invoked to handle the Airways shipment bill and record, calls the UPS service and the results get updated in `ShipmentRecord` table.
-  * All the Shipment records with associated UPS or other carrier shipment labels are saved in DynamoDB `ShipmentRecord` table. Heavy writes and reads in DynamoDB can result in throttling as DynamoDB atempts to scale the table (when using on-demand capacity). Code attempts to retry with increasing backoff rates.
+  * All the Shipment records with associated UPS or other carrier shipment labels are saved in DynamoDB `ShipmentRecord` table. Heavy writes and reads in DynamoDB can result in throttling as DynamoDB attempts to scale the table (when using on-demand capacity). Code attempts to retry with increasing backoff rates.
 * Any repeat submissions to the Aggregation Step Function for an already processed address will return with no operations.
 
 ## Prerequisites
@@ -163,7 +162,7 @@ Steps:
   The post step would already have the correct `/dev` stage and actual resource path `/postshipment` prefilled inside config.json. This does not need to be modified.
   ```
   "post": {
-    "url": "/dev/postShipment",
+    "url": "/dev/postShipment/OEM1",
   ```
   Edit the `arrivalRate` to be small for initial testing (controls how many requests to submit in a given second)
   The duration parameter indicates how long to run the test which can be bumped up. Total number of submitted requests would be equal to (arrival rate * duration).
