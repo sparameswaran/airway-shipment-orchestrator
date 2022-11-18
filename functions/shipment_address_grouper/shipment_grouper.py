@@ -5,7 +5,7 @@ import os
 tableName = os.getenv('SHIPMENT_HASH_TABLE')
 dynamodb = boto3.resource('dynamodb')
 
-def findAddressPartitions(addrHashCode):
+def findAddressPartitions(oemVendor, addrHashCode):
 
     records = []
     moreRows = True
@@ -20,6 +20,10 @@ def findAddressPartitions(addrHashCode):
             exprValue[':addrHashCodeValue'] = addrHashCode
             filtrExpression = filtrExpression + ' and addrHashCode = :addrHashCodeValue'
 
+        if oemVendor is not None:
+            exprValue[':oemVendorPrefix'] = oemVendor
+            filtrExpression = filtrExpression + ' and begins_with(addrHashCode, :oemVendorPrefix)'
+            
         args = { 'FilterExpression': filtrExpression, 'ProjectionExpression': 'addrHashCode,addrDateHash' }
 
         if exprValue:
@@ -53,7 +57,8 @@ def findAddressGroups(event, context):
     # findAddressByDatePartitions would try to pull with a given addrHashCode
     #print('Incoming payload for findAddrByHash: ', event)
     addrHashCode=None
-    addressPartitions = findAddressPartitions(addrHashCode)
+    oemVendor=event.get('OEM')
+    addressPartitions = findAddressPartitions(oemVendor, addrHashCode)
     print('Address partitions:', addressPartitions)
     addressList = [d['addrHashCode'] for d in addressPartitions]
 

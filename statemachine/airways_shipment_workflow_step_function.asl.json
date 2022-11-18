@@ -88,7 +88,7 @@
       "Parameters": {
         "Payload": {
           "addrHashCode.$": "$.input.addrHash.addrHashCode"
-        },
+        },          
         "FunctionName": "${SAWBShadowTableLookupHandlerFunction}"
       },
       "Retry": [
@@ -127,6 +127,18 @@
           }
         }
       },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed",
+            "DynamoDB.InternalServerErrorException"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 6,
+          "Comment": "Retry DDB inserts/updates"
+        }
+      ],
       "ResultPath": null,
       "Next": "Publish Shipment Request via SNS"
     },

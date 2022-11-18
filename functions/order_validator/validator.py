@@ -7,6 +7,8 @@ from datetime import date
 import random
 import time
 
+OEM_MSG_ATTRIBUTE='OEM'
+
 client = boto3.client('stepfunctions')
 #stateMachineArn = os.getenv('BUSINESS_VALIDATION_STEPFUNCTION')
 stateMachineArn = os.getenv('AIRWAYS_SHIPMENT_WORKFLOW_STEPFUNCTION')
@@ -14,6 +16,7 @@ MAX_PARTITION_RANGE = int(os.getenv('MAX_PARTITION_RANGE', 10))
 
 def lambda_handler(event, context):
     print('Incoming Event with number of records: ', len(event['Records']))
+    #print(event)
 
     length = len(event['Records'])
     errors = {}
@@ -21,13 +24,19 @@ def lambda_handler(event, context):
 
     for record in event['Records']:
         rawBody = record['body']
+        
+        associatedOEM = 'DefaultOEM'
+        if len(record['messageAttributes']) > 0:
+            associatedOEM = record['messageAttributes'][OEM_MSG_ATTRIBUTE]['stringValue']
+            
         #print('Shipment record:' , record['body'])
         ediRecord = json.loads(rawBody)
 
         # Go for the very first interchanges record
         ediRecord = ediRecord['interchanges'][0]
 
-        addrHashMap = calculateHash(ediRecord)
+        # Add the associated OEM as prefix to the addr hashes to differentiate from other OEM Shipments
+        addrHashMap =  calculateHash(ediRecord, associatedOEM)
 
         grpIndex = 0
         transactionSetIndex = 0
@@ -104,7 +113,7 @@ def validateAddrRecord(georecord):
     return None
 
 
-def calculateHash(ediRecord):
+def calculateHash(ediRecord, associatedOEM):
 
     addrString = ''
     grpIndex = 0
@@ -134,7 +143,7 @@ def calculateHash(ediRecord):
     #addrSection = ediRecord['groups'][0]['transaction_sets'][0]['name_N1_loop']['geographic_location_N4']
 
     addrEncoded = addrString.encode()
-    hashcode = hashlib.md5(addrEncoded).hexdigest()
+    hashcode = associatedOEM + '#' + hashlib.md5(addrEncoded).hexdigest()
     # Create hash with day and hour and minute so it shows up as brand new row in ShipmentHash and ShipmentRecord
     # Rather than overwriting existing records
     addrDateHash = hashcode + '#' + time.strftime("%Y-%m-%d-%H-%M") + '#' + str(random.randrange(MAX_PARTITION_RANGE))

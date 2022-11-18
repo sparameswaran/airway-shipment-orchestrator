@@ -16,6 +16,7 @@
         ]
       },
       "Resource": "arn:aws:states:::aws-sdk:sqs:getQueueAttributes",
+      "ResultPath": "$.QueueDepth",
       "Next": "Check For Zero Depth"
     },
     "Check For Zero Depth": {
@@ -31,7 +32,7 @@
     },
     "WaitForShortInterval": {
       "Type": "Wait",
-      "Seconds": 5,
+      "Seconds": 2,
       "Next": "Recheck Queue Depth"
     },
     "Recheck Queue Depth": {
@@ -43,6 +44,7 @@
         ]
       },
       "Resource": "arn:aws:states:::aws-sdk:sqs:getQueueAttributes",
+      "ResultPath": "$.QueueDepth",
       "Next": "Recheck again for Zero depth"
     },
     "Recheck again for Zero depth": {
@@ -58,7 +60,7 @@
     },
     "Long Wait": {
       "Type": "Wait",
-      "Seconds": 10,
+      "Seconds": 5,
       "Next": "Check Queue Depth"
     },
     "Reset AirwaysShipment Shadow table": {
@@ -69,6 +71,7 @@
         "Payload.$": "$",
         "FunctionName": "${ResetSAWBShadowTableHandlerFunction}"
       },
+      "ResultPath": null,
       "Retry": [
         {
           "ErrorEquals": [

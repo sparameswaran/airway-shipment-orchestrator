@@ -7,13 +7,22 @@ AIRWAYS_SHIPMENT_SHADOW_TABLE = os.getenv('AIRWAYS_SHIPMENT_SHADOW_TABLE')
 dynamodb = boto3.resource('dynamodb')
 
 def deleteTableContent(event, context):
-    print('Starting deletion of contents from Table: ', AIRWAYS_SHIPMENT_SHADOW_TABLE)
+    #print(event)
+    oemVendor = event.get('OEM')
+    print('Starting deletion of OEM vendor {} contents from Table: {}'.format(oemVendor, AIRWAYS_SHIPMENT_SHADOW_TABLE))
+
 
     tableName = AIRWAYS_SHIPMENT_SHADOW_TABLE
     partitionKey = 'shipmentRecordID'
-    
+
     recordTable = dynamodb.Table(tableName)
-    partitionKeyResponse = recordTable.scan( ProjectionExpression=partitionKey)
+
+    if oemVendor:
+        exprAttributeValues = { ':oemVendorPrefix': oemVendor }
+        filterExpression = 'begins_with(addrDateHash, :oemVendorPrefix)'
+        partitionKeyResponse = recordTable.scan( ProjectionExpression=partitionKey, FilterExpression=filterExpression, ExpressionAttributeValues=exprAttributeValues )
+    else:
+        partitionKeyResponse = recordTable.scan( ProjectionExpression=partitionKey )
 
     totalRows = 0
     hashKeyEntries = partitionKeyResponse['Items']
