@@ -1,4 +1,4 @@
-# airway-shipment-orchestrator
+OE# airway-shipment-orchestrator
 
 This sample project demonstrates airway shipment orchestration using AWS Serverless components including [API Gateway](https://aws.amazon.com/api-gateway/), [Step Functions](https://aws.amazon.com/step-functions/), [Lambda](https://aws.amazon.com/lambda/) along with [SQS](https://aws.amazon.com/sqs/) and [DynamoDB](https://aws.amazon.com/dynamodb/)) to implement complex workflows that integrates automated systems with various decision branches. The use case demonstrates ingestion of multiple shipment requests, validation using business rules, creation of an airway shipment bill per unique destination, aggregating the shipments and invoking UPS for shipping of individual shipment items.
 
@@ -159,7 +159,7 @@ Steps:
   ],
   ....
 ```
-  The post step would already have the correct `/dev` stage and actual resource path `/postshipment` prefilled inside config.json. This does not need to be modified.
+  The post step would already have the correct `/dev` stage and actual resource path `/postShipment`/OEM1 prefilled inside config.json. This does not need to be modified.
   ```
   "post": {
     "url": "/dev/postShipment/OEM1",
@@ -171,14 +171,14 @@ Steps:
   ```bash
   cd testing
   # Edit the AirwaysShipmentApi endpoint before running curl
-  curl -X POST -H 'Content-Type: application/json' https://<AirwaysShipmentApiEndpoint>/dev/postShipment -d @sampleShippingPayload.json
+  curl -X POST -H 'Content-Type: application/json' https://<AirwaysShipmentApiEndpoint>/dev/postShipment/OEM1 -d @sampleShippingPayload.json
   ```
 * Make sure to install artillery using npm (npm intall -g artillery@latest) as mentioned in prerequisites.
 Now start the tests from the `testing folder` using `./runArtillery.sh` script or just run `artillery run config.json`
 Whenever making changes to the code or SAM templates, rerun the sam build followed by sam deploy.
 
 *2)* To kick off the aggeregation and processing of the shipments, wait for the shipment records to show up in the ShipmentRecord DDB table. There can a few failed records that goes to the ShipmentRecordDLQueue with rest being successfully inserted into ShipmentRecord table. The total ingestion process should be over in one-two minutes once artillery has completed its run.
-* Once this is verified, go to the `AggregationKickoffStateMachine2` Step Function and start a new execution. This would check the ShipmentRecordQueue for zero available messages indicating all have been ingested to start the actual aggregation.
+* Once this is verified, go to the `AggregationKickoffStateMachine2` Step Function and start a new execution using sample payload: `{ "OEM": "MyTestOEM1" }` . This would check the ShipmentRecordQueue for zero available messages indicating all have been ingested to start the actual aggregation against OEM vendor `MyTestOEM1`.
 * Wait for the AggregationKickoff to complete.
 * Check the `UPSShipmentHandlerStateMachine5` execution stats to see the actual invocation of UPS or other carrier handling the shipping.
 * The `ShipmentRecord` table should reflect the updated shipment records along with related UPS tracker ids.

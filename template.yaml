@@ -32,12 +32,12 @@ Parameters:
     Type: String
     Description: 'Name of the AWS DynamoDB Table for storing the shipment records'
     Default: ShipmentRecord
-    
+
   InvalidShipmentRecordTableName:
     Type: String
     Description: 'Name of the AWS DynamoDB Table for storing the invalid shipment records'
     Default: InvalidShipmentRecord
-    
+
   ShipmentHashTableName:
     Type: String
     Description: 'Name of the AWS DynamoDB Table for storing the shipment hashes'
@@ -48,9 +48,9 @@ Parameters:
     Default: AirwaysShipmentDetail
   AirwaysShipmentDetailShadowTableName:
     Type: String
-    Description: 'Name of the AWS DynamoDB Shadow Table for storing the Airways shipment labels' 
+    Description: 'Name of the AWS DynamoDB Shadow Table for storing the Airways shipment labels'
     Default: AirwaysShipmentDetailShadow
-    
+
   MaxSubPartitionsForAddresses:
     Type: Number
     Description: 'Max number of sub-partitions for given destination address in DDB'
@@ -163,7 +163,7 @@ Resources:
       Period: 60
       EvaluationPeriods: 1
       DatapointsToAlarm: 1
-      Threshold: 300
+      Threshold: 30000
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: missing
 
@@ -203,7 +203,7 @@ Resources:
       Tags:
         - Key: Name
           Value: ShipmentRecordTable
-          
+
   InvalidShipmentRecordDDB:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -222,7 +222,7 @@ Resources:
       Tags:
         - Key: Name
           Value: InvalidShipmentRecordTable
-          
+
   AirwaysShipmentDetailDDB:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -238,7 +238,7 @@ Resources:
         - Key: Name
           Value: AirwaysShipmentDetail
 
-          
+
   AirwaysShipmentDetailShadowDDB:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -252,7 +252,7 @@ Resources:
           KeyType: HASH
       Tags:
         - Key: Name
-          Value: AirwaysShipmentDetailShadow        
+          Value: AirwaysShipmentDetailShadow
 
   StepFunctionRole:
     Type: AWS::IAM::Role
@@ -533,8 +533,8 @@ Resources:
         Variables:
           AIRWAYS_SHIPMENT_SHADOW_TABLE: !Ref AirwaysShipmentDetailShadowDDB
       Role: !GetAtt LambdaExecutionRole.Arn
-            
-      
+
+
   OrderValidatorFunction:
     Type: AWS::Serverless::Function
     DependsOn: [ LambdaExecutionRole, ShipmentRecordQueue ]
@@ -720,7 +720,7 @@ Resources:
         SupplierHandler: !GetAtt SupplierHandlerFunction.Arn
         UPSShipperService: !GetAtt UPSShipperFunction.Arn
         ShipmentPartitionHandlerStepFunction: !GetAtt ShipmentPartitionHandlerStateMachine4.Arn
-        
+
   AggregationKickoffStateMachine2:
     Type: AWS::Serverless::StateMachine
     #DependsOn: [ ]
@@ -765,7 +765,7 @@ Resources:
         InvalidShipmentRecordTable: !Ref InvalidShipmentRecordDDB
         SAWBShadowTableLookupHandlerFunction: !GetAtt SAWBShadowTableLookupHandlerFunction.Arn
         ShipmentCarrierSNSTopic: !Ref ShipmentCarrierTopic
-        
+
   TriggerShipmentAggregationKickOffFunction:
     Type: AWS::Serverless::Function
     DependsOn: [ LambdaExecutionRole ]
