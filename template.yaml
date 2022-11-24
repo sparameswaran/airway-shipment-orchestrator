@@ -503,6 +503,7 @@ Resources:
           SHIPMENT_RECORD_TABLE: !Ref  ShipmentRecordDDB
           INVALID_SHIPMENT_RECORD_TABLE: !Ref InvalidShipmentRecordDDB
           AIRWAYS_SHIPMENT_TABLE: !Ref AirwaysShipmentDetailDDB
+          AIRWAYS_SHIPMENT_SHADOW_TABLE: !Ref AirwaysShipmentDetailShadowDDB
       Role: !GetAtt LambdaExecutionRole.Arn
 
   SAWBShadowTableLookupHandlerFunction:
