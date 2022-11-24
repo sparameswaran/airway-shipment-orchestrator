@@ -23,7 +23,7 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Variable": "$.Attributes.ApproximateNumberOfMessages",
+          "Variable": "$.QueueDepth.Attributes.ApproximateNumberOfMessages",
           "StringEquals": "0",
           "Next": "WaitForShortInterval"
         }
@@ -51,7 +51,7 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Variable": "$.Attributes.ApproximateNumberOfMessages ",
+          "Variable": "$.QueueDepth.Attributes.ApproximateNumberOfMessages ",
           "StringEquals": "0",
           "Next": "Reset AirwaysShipment Shadow table"
         }
